@@ -134,6 +134,38 @@ export class StreamClient {
     return result.uid;
   }
 
+  /**
+   * Ask Stream to generate captions with its speech-to-text model. The result
+   * is the transcript the moderation screen reads.
+   */
+  async generateCaptions(uid: string, language = "en"): Promise<void> {
+    await this.request("POST", `/${encodeURIComponent(uid)}/captions/${language}/generate`);
+  }
+
+  /** Status of a video's captions in one language: none until generation is requested. */
+  async captionStatus(uid: string, language = "en"): Promise<"none" | "inprogress" | "ready" | "error"> {
+    const captions = await this.request<{ language: string; status?: string }[]>("GET", `/${encodeURIComponent(uid)}/captions`);
+    const match = captions.find((c) => c.language === language);
+    if (!match) return "none";
+    // Uploaded caption files have no status; they are ready.
+    return match.status === "inprogress" || match.status === "error" ? match.status : "ready";
+  }
+
+  /** The captions as WebVTT text (this endpoint returns the file, not a JSON envelope). */
+  async captionVtt(uid: string, language = "en"): Promise<string> {
+    const path = `/${encodeURIComponent(uid)}/captions/${language}/vtt`;
+    const res = await this.fetchImpl(`${API_BASE}/accounts/${this.config.accountId}/stream${path}`, {
+      headers: { Authorization: `Bearer ${this.config.apiToken}` },
+    });
+    if (!res.ok) throw new StreamApiError(`Cloudflare Stream GET ${path} failed: ${res.statusText}`, res.status);
+    return res.text();
+  }
+
+  /** A still frame at `seconds` into the video (pass a signed token instead of the uid for signed videos). */
+  frameUrl(uidOrToken: string, seconds: number, height = 480): string {
+    return `${this.playbackUrls(uidOrToken).thumbnail}?time=${Math.max(0, Math.round(seconds))}s&height=${height}`;
+  }
+
   /** Playback URLs for a video uid, or for a signed token (which replaces the uid). */
   playbackUrls(uidOrToken: string) {
     const base = `https://customer-${this.config.customerCode}.cloudflarestream.com/${uidOrToken}`;

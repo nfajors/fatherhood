@@ -86,6 +86,33 @@ describe("StreamClient", () => {
     });
   });
 
+  it("requests captions and reads their status and VTT", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/captions")) return jsonResponse({ success: true, result: [{ language: "en", status: "inprogress" }] });
+      if (url.endsWith("/vtt")) return new Response("WEBVTT\n\n00:00.000 --> 00:01.000\nHi\n");
+      return jsonResponse({ success: true, result: {} });
+    });
+    const client = make(fetchMock as unknown as typeof fetch);
+    await client.generateCaptions("v");
+    expect(await client.captionStatus("v")).toBe("inprogress");
+    expect(await client.captionStatus("v", "fr")).toBe("none");
+    expect(await client.captionVtt("v")).toContain("Hi");
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(`${calls[0]![1].method} ${calls[0]![0].split("/stream")[1]}`).toBe("POST /v/captions/en/generate");
+  });
+
+  it("treats uploaded captions (no status) as ready, and reports VTT errors", async () => {
+    const ready = make(vi.fn(async () => jsonResponse({ success: true, result: [{ language: "en" }] })) as unknown as typeof fetch);
+    expect(await ready.captionStatus("v")).toBe("ready");
+    const missing = make(vi.fn(async () => new Response("no", { status: 404, statusText: "Not Found" })) as unknown as typeof fetch);
+    await expect(missing.captionVtt("v")).rejects.toThrowError(/Not Found/);
+  });
+
+  it("builds frame URLs at whole seconds", () => {
+    expect(make(fetch).frameUrl("tok", 12.6)).toBe("https://customer-abc123.cloudflarestream.com/tok/thumbnails/thumbnail.jpg?time=13s&height=480");
+    expect(make(fetch).frameUrl("tok", -5, 240)).toContain("?time=0s&height=240");
+  });
+
   it("builds customer-domain playback URLs", () => {
     const urls = make(fetch).playbackUrls("tokenOrUid");
     expect(urls.hls).toBe("https://customer-abc123.cloudflarestream.com/tokenOrUid/manifest/video.m3u8");

@@ -222,6 +222,11 @@ export const videoStatus = pgEnum("video_status", [
 ]);
 export type VideoStatus = (typeof videoStatus.enumValues)[number];
 
+export const aiRecommendation = pgEnum("ai_recommendation", ["approve", "review", "reject"]);
+export type AiRecommendation = (typeof aiRecommendation.enumValues)[number];
+export const aiRisk = pgEnum("ai_risk", ["low", "medium", "high"]);
+export type AiRisk = (typeof aiRisk.enumValues)[number];
+
 export const videos = pgTable(
   "videos",
   {
@@ -244,8 +249,16 @@ export const videos = pgTable(
     thumbnailUrl: text("thumbnail_url"),
     watermarkApplied: boolean("watermark_applied").notNull().default(false),
     requireSignedUrls: boolean("require_signed_urls").notNull(),
-    /** AI pre-screen output (moderation categories, relevance score, notes). */
+    /** Full AI pre-screen result (see lib/moderation/screen.ts). */
     moderation: jsonb("moderation"),
+    /** When the AI pre-screen finished; null while it is still waiting or running. */
+    screenedAt: timestamp("screened_at", { withTimezone: true }),
+    aiRecommendation: aiRecommendation("ai_recommendation"),
+    aiRisk: aiRisk("ai_risk"),
+    /** When Stream was asked to generate captions (the transcript the AI screens). */
+    captionsRequestedAt: timestamp("captions_requested_at", { withTimezone: true }),
+    /** Review deadline (SLA) while the video is in the queue. */
+    reviewDueAt: timestamp("review_due_at", { withTimezone: true }),
     ratingAverage: numeric("rating_average", { precision: 3, scale: 2 }),
     ratingCount: integer("rating_count").notNull().default(0),
     viewCount: integer("view_count").notNull().default(0),
@@ -257,16 +270,20 @@ export const videos = pgTable(
   (t) => [
     index("videos_creator_id_idx").on(t.creatorId),
     index("videos_type_status_idx").on(t.type, t.status),
+    index("videos_status_review_due_idx").on(t.status, t.reviewDueAt),
   ],
 );
 
 export const videoReviewAction = pgEnum("video_review_action", [
   "ai_screen",
+  "auto_approve",
   "approve",
   "reject",
   "request_changes",
   "unpublish",
+  "restore",
 ]);
+export type VideoReviewAction = (typeof videoReviewAction.enumValues)[number];
 
 /** Audit trail of every moderation decision; reviewerId is null for the AI pre-screen. */
 export const videoReviews = pgTable(
@@ -469,13 +486,21 @@ export const contentReports = pgTable(
       .notNull()
       .references(() => videos.id, { onDelete: "cascade" }),
     reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    /** One of REPORT_REASONS (lib/moderation/policy.ts). */
     reason: text("reason").notNull(),
+    details: text("details"),
     status: reportStatus("status").notNull().default("open"),
     resolvedById: text("resolved_by_id").references(() => user.id, { onDelete: "set null" }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("content_reports_status_idx").on(t.status)],
+  (t) => [
+    index("content_reports_status_idx").on(t.status),
+    // One open report per person per video.
+    uniqueIndex("content_reports_open_per_reporter_idx")
+      .on(t.videoId, t.reporterId)
+      .where(sql`${t.status} = 'open'`),
+  ],
 );
 
 // ---------------------------------------------------------------------------

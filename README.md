@@ -44,9 +44,9 @@ Without it the site works normally and content waits, unthemed, for an admin.
 **Email (Resend).** Set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in
 Resend). Without a key, emails are printed to the server log instead of sent.
 
-**Scheduled jobs.** Set `CRON_SECRET`. `vercel.json` calls `/api/cron/gift-delivery` hourly on
-Vercel; on other hosts, call it hourly with `Authorization: Bearer $CRON_SECRET` or run
-`npm run gifts:deliver`.
+**Scheduled jobs.** Set `CRON_SECRET`. On Vercel, `vercel.json` runs `/api/cron/gift-delivery`
+hourly and `/api/cron/moderation` every 10 minutes (sub-daily crons need a paid Vercel plan). On
+other hosts, call both with `Authorization: Bearer $CRON_SECRET` on the same schedule.
 
 **Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
 
@@ -126,6 +126,25 @@ on `/themes` for members and `/admin/themes` for admins.
 
 Tuning lives in `src/lib/themes/policy.ts`.
 
+## Moderation
+
+`/admin/moderation` is the review queue; `src/lib/moderation/` holds the rules (`policy.ts`).
+
+- **AI pre-screen.** When a video finishes processing, Stream is asked for captions. Once the
+  transcript is ready (or after 30 minutes), Claude reads the title, description and transcript
+  and looks at 4 frames. It rates each policy area from the plan, scores relevance to fatherhood,
+  and recommends approve, review or reject. If the AI declines to assess a video, that is
+  treated as high risk.
+- **Auto-approval is narrow.** Only a Community video that is low risk in every area, at least
+  80 relevant, has a transcript, and comes from a creator a person has approved before. Everything
+  else goes to the queue. The AI never rejects on its own.
+- **Queue.** Ordered by risk, then deadline: Community videos are due within 48 hours, professional
+  within 120. Reviewers approve, request changes or reject (a reason is required and goes to the
+  creator), and can later unpublish or restore. Every decision is logged and emailed to the creator.
+- **Reports.** Signed-in viewers can report a published video (`POST /api/videos/{id}/report`). At
+  3 different reporters the video is hidden until an admin decides; admins then dismiss the reports
+  or mark them actioned.
+
 ## Gift memberships
 
 `/gift` sells 1 year ($199) or 1 month ($19) as a gift; `/redeem` redeems it. Code in
@@ -172,8 +191,8 @@ at upload time.
 
 Done: project scaffold, schema and migrations, auth, membership checkout and
 billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
-pages, creator revenue-share settlement, AI themes, gift memberships.
+pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue.
 
-Next (Phase 1): admin moderation queue and AI pre-screen, course catalog and player
-UI, creator upload UI and dashboard (including earnings), ratings and progress
+Next (Phase 1): course catalog and player UI (including the report button), creator
+upload UI and dashboard (including earnings and review status), ratings and progress
 tracking, search.
