@@ -36,6 +36,13 @@
       "when": 1792269398271,
       "tag": "0004_moderation_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792276507423,
+      "tag": "0005_creator_studio",
+      "breakpoints": true
     }
   ]
 }

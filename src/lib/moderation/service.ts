@@ -50,7 +50,7 @@ type Transition = {
   email: DecisionEmailInput["decision"] | null;
 };
 
-export const TRANSITIONS: Record<Exclude<VideoReviewAction, "ai_screen">, Transition> = {
+export const TRANSITIONS: Record<Exclude<VideoReviewAction, "ai_screen" | "resubmit">, Transition> = {
   approve: { from: ["pending_review", "changes_requested"], to: "approved", notesRequired: false, email: "approved" },
   auto_approve: { from: ["pending_review"], to: "approved", notesRequired: false, email: "approved" },
   request_changes: { from: ["pending_review"], to: "changes_requested", notesRequired: true, email: "changes_requested" },
@@ -233,7 +233,17 @@ export async function screenVideo(
     transcript,
     frameUrls: frames,
   });
-  const decision = decide({ type: current.type, result, creatorHasHumanApproval: await creatorHasHumanApproval(db, current.creatorId) });
+  const [changesRequested] = await db
+    .select({ id: videoReviews.id })
+    .from(videoReviews)
+    .where(and(eq(videoReviews.videoId, current.id), eq(videoReviews.action, "request_changes")))
+    .limit(1);
+  const decision = decide({
+    type: current.type,
+    result,
+    creatorHasHumanApproval: await creatorHasHumanApproval(db, current.creatorId),
+    reviewerRequestedChanges: Boolean(changesRequested),
+  });
 
   await db.transaction(async (tx) => {
     await tx

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ErrorText, useAdminAction } from "./use-admin-action";
+import { ErrorText, useApiAction } from "@/components/use-api-action";
 
 export function ThemeStatusButtons({
   themeId,
@@ -13,7 +13,7 @@ export function ThemeStatusButtons({
   status: "proposed" | "active" | "archived";
   mergeTargets: { id: string; name: string }[];
 }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [target, setTarget] = useState("");
   const url = `/api/admin/themes/${themeId}`;
   return (
@@ -64,7 +64,7 @@ export function ThemeStatusButtons({
 }
 
 export function ThemeEditForm({ themeId, name, description }: { themeId: string; name: string; description: string }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
@@ -104,7 +104,7 @@ export function ThemeEditForm({ themeId, name, description }: { themeId: string;
 }
 
 export function NewThemeForm() {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -131,7 +131,7 @@ export function NewThemeForm() {
 }
 
 export function ClassifyButton({ target, label = "Run AI" }: { target?: { kind: "video" | "course"; id: string }; label?: string }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   return (
     <span>
       <Button
@@ -148,7 +148,7 @@ export function ClassifyButton({ target, label = "Run AI" }: { target?: { kind: 
 }
 
 export function RemovePlacementButton({ themeId, target }: { themeId: string; target: { kind: "video" | "course"; id: string } }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   return (
     <span>
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(`/api/admin/themes/${themeId}/content`, "DELETE", target)}>
@@ -160,7 +160,7 @@ export function RemovePlacementButton({ themeId, target }: { themeId: string; ta
 }
 
 export function RestorePlacementButton({ themeId, target }: { themeId: string; target: { kind: "video" | "course"; id: string } }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   return (
     <span>
       <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(`/api/admin/themes/${themeId}/content`, "PUT", target)}>

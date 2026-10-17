@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminUser, type SessionUser } from "@/lib/auth";
 import { CourseError } from "@/lib/courses/admin";
+import { ApplicationError } from "@/lib/creators/applications";
 import { ModerationError } from "@/lib/moderation/service";
 import { ThemeServiceError } from "@/lib/themes/service";
 
@@ -24,6 +25,9 @@ export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>
     if (error instanceof ThemeServiceError) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof CourseError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 400 });
+    }
+    if (error instanceof ApplicationError) {
+      return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" || error.reason === "no_account" ? 404 : 409 });
     }
     if (error instanceof ModerationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: MODERATION_STATUS[error.reason] });

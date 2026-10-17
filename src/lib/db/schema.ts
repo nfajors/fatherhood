@@ -282,6 +282,8 @@ export const videoReviewAction = pgEnum("video_review_action", [
   "request_changes",
   "unpublish",
   "restore",
+  /** The creator edited the video or replaced its file and sent it back for review. */
+  "resubmit",
 ]);
 export type VideoReviewAction = (typeof videoReviewAction.enumValues)[number];
 
@@ -522,9 +524,15 @@ export const creatorApplications = pgTable(
     status: applicationStatus("status").notNull().default("pending"),
     reviewedById: text("reviewed_by_id").references(() => user.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /** The admin's note to the applicant, sent with the decision. */
+    decisionNotes: text("decision_notes"),
     ...timestamps,
   },
-  (t) => [index("creator_applications_user_id_idx").on(t.userId)],
+  (t) => [
+    index("creator_applications_user_id_idx").on(t.userId),
+    // One open application per person.
+    uniqueIndex("creator_applications_pending_idx").on(t.userId).where(sql`${t.status} = 'pending'`),
+  ],
 );
 
 export const payoutStatus = pgEnum("payout_status", ["pending", "processing", "paid", "failed"]);

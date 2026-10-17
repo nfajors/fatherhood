@@ -14,6 +14,7 @@ export function SiteFooter() {
           <Link href="/redeem">Redeem a gift</Link>
           <Link href="/book">The Book</Link>
           <Link href="/community">Community Voices</Link>
+          <Link href="/fellows">Become a Fellow</Link>
         </nav>
       </div>
     </footer>

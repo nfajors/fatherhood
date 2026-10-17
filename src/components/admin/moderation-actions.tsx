@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ErrorText, useAdminAction } from "./use-admin-action";
+import { ErrorText, useApiAction } from "@/components/use-api-action";
 
 type Status = "pending_review" | "changes_requested" | "approved" | "unpublished" | "rejected" | string;
 type Decision = "approve" | "request_changes" | "reject" | "unpublish" | "restore";
@@ -27,7 +27,7 @@ function decisionsFor(status: Status): Decision[] {
 
 /** Decision panel on the review page. Notes go to the creator and are required for negative decisions. */
 export function ReviewActions({ videoId, status }: { videoId: string; status: Status }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [chosen, setChosen] = useState<Decision | null>(null);
   const [notes, setNotes] = useState("");
   const decisions = decisionsFor(status);
@@ -84,7 +84,7 @@ export function ReviewActions({ videoId, status }: { videoId: string; status: St
 }
 
 export function BulkApproveButton({ videoIds }: { videoIds: string[] }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   if (videoIds.length === 0) return null;
   return (
     <span>
@@ -97,7 +97,7 @@ export function BulkApproveButton({ videoIds }: { videoIds: string[] }) {
 }
 
 export function RescreenButton({ videoId }: { videoId: string }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   return (
     <span>
       <Button size="sm" variant="outline" disabled={pending} onClick={() => run(`/api/admin/moderation/${videoId}/rescreen`, "POST")}>
@@ -109,7 +109,7 @@ export function RescreenButton({ videoId }: { videoId: string }) {
 }
 
 export function ResolveReportsButtons({ videoId }: { videoId: string }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const url = `/api/admin/moderation/${videoId}/reports`;
   return (
     <span className="inline-flex flex-wrap gap-2">

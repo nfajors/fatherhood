@@ -99,6 +99,39 @@ export class StreamClient {
     });
   }
 
+  /**
+   * Start a resumable (tus) direct upload of `uploadLength` bytes. The browser
+   * sends the file in chunks straight to the returned URL. Settings travel as
+   * tus Upload-Metadata and are always set here, never taken from the browser.
+   */
+  async createTusUpload(options: DirectUploadOptions & { uploadLength: number; name: string }): Promise<{ uploadURL: string; uid: string }> {
+    const expiresIn = options.expiresInSeconds ?? 6 * 60 * 60;
+    const res = await this.fetchImpl(`${API_BASE}/accounts/${this.config.accountId}/stream?direct_user=true`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.config.apiToken}`,
+        "Tus-Resumable": "1.0.0",
+        "Upload-Length": String(options.uploadLength),
+        "Upload-Creator": options.creatorId,
+        "Upload-Metadata": tusMetadata({
+          name: options.name,
+          maxDurationSeconds: String(options.maxDurationSeconds),
+          expiry: new Date(Date.now() + expiresIn * 1000).toISOString(),
+          thumbnailtimestamppct: "0.1",
+          requiresignedurls: options.requireSignedURLs ? true : undefined,
+          watermark: options.watermarkUid,
+        }),
+      },
+    });
+    const uploadURL = res.headers.get("location");
+    const uid = res.headers.get("stream-media-id");
+    if (!res.ok || !uploadURL || !uid) {
+      const detail = await res.text().catch(() => "");
+      throw new StreamApiError(`Cloudflare Stream tus upload failed: ${res.status} ${detail || res.statusText}`.trim(), res.status);
+    }
+    return { uploadURL, uid };
+  }
+
   async getVideo(uid: string): Promise<StreamVideo> {
     return this.request("GET", `/${encodeURIComponent(uid)}`);
   }
@@ -176,6 +209,17 @@ export class StreamClient {
       thumbnail: `${base}/thumbnails/thumbnail.jpg`,
     };
   }
+}
+
+/**
+ * tus Upload-Metadata: comma-separated `key base64(value)` pairs; `true` sends
+ * a bare key (a flag) and undefined values are left out.
+ */
+export function tusMetadata(values: Record<string, string | true | undefined>): string {
+  return Object.entries(values)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => (v === true ? k : `${k} ${Buffer.from(v as string, "utf8").toString("base64")}`))
+    .join(",");
 }
 
 /**

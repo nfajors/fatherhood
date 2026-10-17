@@ -8,6 +8,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { resubmit } from "@/lib/creators/videos";
 import type { Database } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import type { EmailMessage, Mailer } from "@/lib/email";
@@ -242,6 +243,20 @@ describe.skipIf(!url)("moderation (Postgres)", () => {
       const actions = (await db.select().from(schema.videoReviews).where(eq(schema.videoReviews.videoId, video.id))).map((r) => r.action);
       expect(actions.sort()).toEqual(["ai_screen", "auto_approve"]);
       expect(mailer.sent.at(-1)!.subject).toBe('Your video "Video 2" is live');
+    });
+
+    it("sends a resubmission after a change request to a person, even with a clean screen", async () => {
+      const earlier = await queued();
+      await applyReview(db, { videoId: earlier.id, action: "approve", reviewerId: "admin" }, null, NOW);
+      media.status = "ready";
+      const video = await queued();
+      await applyReview(db, { videoId: video.id, action: "request_changes", reviewerId: "admin", notes: "Trim the intro." }, null, NOW);
+      await resubmit(db, "fellow", video.id, "Trimmed it.", NOW);
+
+      const outcome = await screenVideo(db, video.id, deps(), { now: minutesLater(1), force: true });
+      expect(outcome.state).toBe("screened");
+      expect((await row(video.id)).status).toBe("pending_review");
+      expect(outcome.state === "screened" && outcome.decision.reasons.join(" ")).toMatch(/asked for changes/);
     });
 
     it("never auto-approves on a system approval alone, or a risky screen", async () => {

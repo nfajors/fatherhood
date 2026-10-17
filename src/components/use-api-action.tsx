@@ -14,8 +14,8 @@ async function call(url: string, method: string, body?: unknown): Promise<string
   return data.message ?? data.error ?? `Request failed (${res.status})`;
 }
 
-/** Runs an admin API call, then refreshes the server-rendered page. */
-export function useAdminAction() {
+/** Runs an API call, then refreshes the server-rendered page. */
+export function useApiAction() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);

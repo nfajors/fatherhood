@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { exportJWK, generateKeyPair, jwtVerify, decodeProtectedHeader } from "jose";
 import { describe, expect, it, vi } from "vitest";
-import { signPlaybackToken, StreamApiError, StreamClient, verifyStreamWebhook } from "./stream";
+import { signPlaybackToken, StreamApiError, StreamClient, tusMetadata, verifyStreamWebhook } from "./stream";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -46,6 +46,45 @@ describe("StreamClient", () => {
     });
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(init.body as string)).not.toHaveProperty("watermark");
+  });
+
+  it("starts a resumable upload with settings set server-side", async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(null, { status: 201, headers: { Location: "https://upload.cloudflarestream.com/tus/abc", "stream-media-id": "vid9" } }),
+    );
+    const result = await make(fetchMock as unknown as typeof fetch).createTusUpload({
+      uploadLength: 123_456,
+      name: "Bedtime, with commas",
+      maxDurationSeconds: 480,
+      creatorId: "user-1",
+      requireSignedURLs: true,
+      watermarkUid: "wm1",
+    });
+    expect(result).toEqual({ uploadURL: "https://upload.cloudflarestream.com/tus/abc", uid: "vid9" });
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acct/stream?direct_user=true");
+    const headers = init.headers as Record<string, string>;
+    expect(headers).toMatchObject({ "Tus-Resumable": "1.0.0", "Upload-Length": "123456", "Upload-Creator": "user-1" });
+    const meta = Object.fromEntries(
+      headers["Upload-Metadata"]!.split(",").map((pair) => {
+        const [k, v] = pair.split(" ");
+        return [k, v === undefined ? true : Buffer.from(v, "base64").toString("utf8")];
+      }),
+    );
+    expect(meta).toMatchObject({ name: "Bedtime, with commas", maxDurationSeconds: "480", requiresignedurls: true, watermark: "wm1" });
+    expect(Date.parse(meta.expiry as string)).toBeGreaterThan(Date.now());
+  });
+
+  it("leaves out the signed-URL flag and watermark when not wanted", () => {
+    expect(tusMetadata({ name: "a", requiresignedurls: undefined, watermark: undefined })).toBe(`name ${Buffer.from("a").toString("base64")}`);
+  });
+
+  it("raises when Cloudflare refuses a resumable upload", async () => {
+    const fetchMock = vi.fn(async () => new Response("over quota", { status: 403 }));
+    await expect(
+      make(fetchMock as unknown as typeof fetch).createTusUpload({ uploadLength: 1, name: "x", maxDurationSeconds: 1, creatorId: "c", requireSignedURLs: false }),
+    ).rejects.toThrowError(/403 over quota/);
   });
 
   it("raises StreamApiError with Cloudflare's message on failure", async () => {

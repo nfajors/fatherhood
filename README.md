@@ -85,13 +85,17 @@ src/
     api/stripe/checkout     start a membership (Stripe Checkout)
     api/stripe/portal       Stripe customer portal
     api/stripe/webhook      sync subscriptions (idempotent)
-    api/videos/upload-url   one-time Cloudflare upload URL (Fellows: Community; admins: anything)
+    api/studio/videos/...   creator uploads (resumable, straight to Cloudflare), edits, resubmission
+    api/fellows/apply       apply for Fellow (upload) access
     api/videos/[id]/playback  entitlement check, signed URL for paid content
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
     academy/                course catalog, course pages, lesson player
     community/              Community Voices library and video pages
     learning/               My Learning: continue watching, courses in progress
     admin/courses/          course builder
+    admin/creators/         Fellow applications and access
+    studio/                 creator Studio: dashboard, upload, video pages, earnings
+    fellows/                about Fellows, and the application form
     api/stream/webhook      encoding finished -> review queue (or failed / too long)
   lib/
     config.ts               prices, limits, categories
@@ -99,6 +103,7 @@ src/
     stream.ts               Cloudflare Stream client, token signing, webhook verification
     stripe.ts               Stripe client and subscription mapping
     courses/                catalog queries and the course builder
+    creators/               Fellow applications, creator uploads, Studio dashboard and earnings
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
 drizzle/                    SQL migrations
@@ -133,6 +138,32 @@ visible only to their creator and admins.
 - **Course builder.** `/admin/courses`: create a draft, add modules and lessons, attach approved
   professional videos, mark previews, reorder, and publish. Publishing requires every lesson
   to have an approved professional video, and classifies the course into themes.
+
+## Fellows and the Studio
+
+- **Becoming a Fellow.** `/fellows` explains the program and takes applications (one open
+  application per person). Admins approve or decline at `/admin/creators`, with an optional
+  note emailed to the applicant, or grant access by email to an existing account (founding
+  Fellows). Access can be removed; published videos stay up.
+- **Uploading** (`/studio/upload`). The browser checks the file first (type, size, and the
+  8-minute Community limit, when it can read the length), then uploads it resumably (tus,
+  50 MB chunks) straight to Cloudflare; our server only starts the upload, with the length
+  cap, signed-URL and watermark settings it sets itself. A stopped upload resumes when the
+  same file is chosen again. Once the file is in, the video shows as processing until
+  Stream's webhook puts it in the review queue.
+- **Review status.** Each video page shows its status, the reviewer's notes and the history.
+  Details can be edited until the video is published. After a change request the creator
+  resubmits (with a note to the reviewer) or uploads a new version, which replaces the old
+  file and is screened again. A resubmission is never auto-approved: a person checks it.
+  Unpublished videos can be deleted.
+- **Dashboard** (`/studio`). Published videos, views and watch time (all time and last 30
+  days), rating, a 30-day views chart, and what needs attention.
+- **Earnings** (`/studio/earnings`). This month's estimate, computed exactly as settlement
+  will, with the two pool requirements as a checklist and views by video; past months with
+  per-video breakdowns; payouts and balances. Creators see only their own figures, never the
+  pool or anyone else's share.
+- **Own views don't count.** A creator watching their own video keeps their place but earns
+  no views or pool share.
 
 ## Themes
 
@@ -221,7 +252,7 @@ Done: project scaffold, schema and migrations, auth, membership checkout and
 billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
 pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue,
 course catalog, course builder, video player with watch tracking and progress, Community
-Voices library, My Learning.
+Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
+resubmission, dashboard, earnings).
 
-Next (Phase 1): creator upload UI and dashboard (including earnings, review status and
-resubmission), ratings, search, lesson resource downloads.
+Next (Phase 1): ratings, search, lesson resource downloads.

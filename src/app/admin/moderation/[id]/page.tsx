@@ -6,6 +6,7 @@ import { RescreenButton, ResolveReportsButtons, ReviewActions } from "@/componen
 import { RiskBadge, SlaBadge } from "@/components/admin/moderation-badges";
 import { Card } from "@/components/ui/card";
 import { getDb } from "@/lib/db";
+import type { VideoReviewAction } from "@/lib/db/schema";
 import { themeClassifierConfigured } from "@/lib/env";
 import { slaState } from "@/lib/moderation/decide";
 import { REPORT_REASONS, RISK_CATEGORIES, type ReportReason, type RiskCategory } from "@/lib/moderation/policy";
@@ -15,7 +16,7 @@ import { signPlaybackToken, streamFromEnv } from "@/lib/stream";
 export const metadata: Metadata = { title: "Review video (admin)", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const ACTION_LABEL: Record<string, string> = {
+const ACTION_LABEL: Record<VideoReviewAction, string> = {
   ai_screen: "AI / system",
   auto_approve: "Auto-approved",
   approve: "Approved",
@@ -23,6 +24,7 @@ const ACTION_LABEL: Record<string, string> = {
   request_changes: "Changes requested",
   unpublish: "Unpublished",
   restore: "Restored",
+  resubmit: "Resubmitted by creator",
 };
 
 const LEVEL_STYLE: Record<string, string> = {

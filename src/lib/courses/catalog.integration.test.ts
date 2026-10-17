@@ -247,6 +247,17 @@ describe.skipIf(!url)("courses and playback (Postgres)", () => {
       expect(await db.$count(schema.watchProgress)).toBe(0); // anonymous viewers have no saved progress
     });
 
+    it("gives creators no views or watch time for their own videos, but keeps their place", async () => {
+      const v = await video({ type: "community", creatorId: "fellow", requireSignedUrls: false });
+      const s = await recordHeartbeat(db, { videoId: v.id, userId: "fellow", sessionId: null, positionSeconds: 0, watchedSeconds: 0, ended: false }, T0);
+      for (const t of [15, 30, 45]) {
+        await recordHeartbeat(db, { videoId: v.id, userId: "fellow", sessionId: s.sessionId, positionSeconds: t, watchedSeconds: 15, ended: false }, at(t));
+      }
+      expect((await db.select().from(schema.watchSessions))[0]).toMatchObject({ secondsWatched: 0, maxPositionSeconds: 45 });
+      expect((await db.query.videos.findFirst({ where: eq(schema.videos.id, v.id) }))!.viewCount).toBe(0);
+      expect((await db.select().from(schema.watchProgress))[0]).toMatchObject({ userId: "fellow", positionSeconds: 45 });
+    });
+
     it("saves resume position and keeps completion once reached", async () => {
       const v = await video();
       const s = await recordHeartbeat(db, { videoId: v.id, userId: "member", sessionId: null, positionSeconds: 0, watchedSeconds: 0, ended: false }, T0);

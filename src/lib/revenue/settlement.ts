@@ -13,7 +13,7 @@ import {
   videos,
   watchSessions,
 } from "@/lib/db/schema";
-import { allocatePool, payableBalances, poolAmountCents, quarterToDate, type CreatorInput, type Period } from "./pool";
+import { allocatePool, payableBalances, poolAmountCents, quarterToDate, type CreatorInput, type CreatorShare, type Period } from "./pool";
 import { REVENUE_POLICY } from "./policy";
 
 export type SettlementResult = {
@@ -31,7 +31,7 @@ export class SettlementError extends Error {}
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 /** Gather per-creator inputs for the period. */
-async function loadCreatorInputs(db: Transaction, period: Period): Promise<CreatorInput[]> {
+async function loadCreatorInputs(db: Database | Transaction, period: Period): Promise<CreatorInput[]> {
   const quarter = quarterToDate(period);
   const postedAt = sql`coalesce(${videos.publishedAt}, ${videos.createdAt})`;
 
@@ -80,6 +80,23 @@ async function loadCreatorInputs(db: Transaction, period: Period): Promise<Creat
   return [...byCreator.values()].sort((a, b) => a.creatorId.localeCompare(b.creatorId));
 }
 
+async function periodRevenueCents(db: Database | Transaction, period: Period): Promise<number> {
+  const [revenue] = await db
+    .select({ cents: sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)::int` })
+    .from(revenueLedger)
+    .where(and(gte(revenueLedger.occurredAt, period.start), lt(revenueLedger.occurredAt, period.end)));
+  return revenue?.cents ?? 0;
+}
+
+/**
+ * What settling the period would pay, without recording anything: the
+ * in-month estimate creators see. Uses the same inputs and math as settlePeriod.
+ */
+export async function estimatePeriod(db: Database, period: Period): Promise<{ inputs: CreatorInput[]; shares: CreatorShare[] }> {
+  const inputs = await loadCreatorInputs(db, period);
+  return { inputs, shares: allocatePool(poolAmountCents(await periodRevenueCents(db, period)), inputs) };
+}
+
 /**
  * Settle one period. Re-running a completed period returns the stored result
  * unless `force` is set; forcing is refused once any share has been paid out.
@@ -116,11 +133,7 @@ export async function settlePeriod(db: Database, period: Period, options: { forc
       await tx.delete(poolCalculations).where(eq(poolCalculations.id, existing.id));
     }
 
-    const [revenue] = await tx
-      .select({ cents: sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)::int` })
-      .from(revenueLedger)
-      .where(and(gte(revenueLedger.occurredAt, period.start), lt(revenueLedger.occurredAt, period.end)));
-    const subscriptionRevenueCents = revenue?.cents ?? 0;
+    const subscriptionRevenueCents = await periodRevenueCents(tx, period);
     const poolCents = poolAmountCents(subscriptionRevenueCents);
     const shares = allocatePool(poolCents, await loadCreatorInputs(tx, period));
 
