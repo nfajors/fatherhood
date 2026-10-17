@@ -1,9 +1,10 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getDb } from "@/lib/db";
-import { processedWebhookEvents, subscriptions } from "@/lib/db/schema";
+import { processedWebhookEvents, revenueLedger, subscriptions, user } from "@/lib/db/schema";
 import { stripeEnv } from "@/lib/env";
-import { getStripe, toSubscriptionRecord } from "@/lib/stripe";
+import { getStripe, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
 
 const SUBSCRIPTION_EVENTS = new Set([
   "customer.subscription.created",
@@ -14,8 +15,9 @@ const SUBSCRIPTION_EVENTS = new Set([
 ]);
 
 /**
- * Stripe webhook: keeps `subscriptions` in sync, which is what grants access.
- * Each event id is recorded so Stripe's retries are processed once.
+ * Stripe webhook: keeps `subscriptions` in sync, which is what grants access,
+ * and records paid subscription invoices in the revenue ledger that funds the
+ * creator pool. Each event id is recorded so Stripe's retries are processed once.
  */
 export async function POST(request: Request) {
   const env = stripeEnv();
@@ -39,6 +41,26 @@ export async function POST(request: Request) {
       .onConflictDoNothing()
       .returning({ id: processedWebhookEvents.id });
     if (inserted.length === 0) return; // already handled
+
+    if (event.type === "invoice.paid") {
+      const entry = toLedgerEntry(event.data.object as Stripe.Invoice);
+      if (!entry) return;
+      const owner = await tx.query.user.findFirst({
+        where: eq(user.stripeCustomerId, entry.stripeCustomerId),
+        columns: { id: true },
+      });
+      await tx
+        .insert(revenueLedger)
+        .values({
+          kind: "subscription_invoice",
+          stripeObjectId: entry.stripeInvoiceId,
+          userId: owner?.id ?? null,
+          amountCents: entry.amountCents,
+          occurredAt: entry.paidAt,
+        })
+        .onConflictDoNothing();
+      return;
+    }
 
     let sub: Stripe.Subscription | null = null;
     if (SUBSCRIPTION_EVENTS.has(event.type)) {

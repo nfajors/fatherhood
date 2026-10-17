@@ -489,3 +489,75 @@ export const creatorPayouts = pgTable(
   },
   (t) => [index("creator_payouts_creator_id_idx").on(t.creatorId)],
 );
+
+// ---------------------------------------------------------------------------
+// Revenue share (policy in lib/revenue/policy.ts)
+// ---------------------------------------------------------------------------
+
+export const revenueKind = pgEnum("revenue_kind", ["subscription_invoice", "gift"]);
+
+/** Paid subscription revenue, recorded from Stripe; the base for the creator pool. */
+export const revenueLedger = pgTable(
+  "revenue_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: revenueKind("kind").notNull(),
+    /** Stripe invoice or checkout session id; unique so webhook retries are no-ops. */
+    stripeObjectId: text("stripe_object_id").notNull().unique(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    amountCents: integer("amount_cents").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("revenue_ledger_occurred_at_idx").on(t.occurredAt)],
+);
+
+export const poolCalculationStatus = pgEnum("pool_calculation_status", ["processing", "completed", "failed"]);
+
+/** One creator-pool settlement per period. */
+export const poolCalculations = pgTable(
+  "pool_calculations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    status: poolCalculationStatus("status").notNull().default("processing"),
+    algorithmVersion: text("algorithm_version").notNull(),
+    subscriptionRevenueCents: integer("subscription_revenue_cents").notNull(),
+    poolShareBps: integer("pool_share_bps").notNull(),
+    poolCents: integer("pool_cents").notNull(),
+    eligibleCreators: integer("eligible_creators").notNull().default(0),
+    errorMessage: text("error_message"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("pool_calculations_period_idx").on(t.periodStart, t.periodEnd)],
+);
+
+/** A creator's share of one period's pool; linked to a payout once paid out. */
+export const poolShares = pgTable(
+  "pool_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    calculationId: uuid("calculation_id")
+      .notNull()
+      .references(() => poolCalculations.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    videosPostedInQuarter: integer("videos_posted_in_quarter").notNull(),
+    qualifyingViews: integer("qualifying_views").notNull(),
+    /** Engagement score in milli-points (52.65 points = 52650). */
+    engagementScoreMilli: integer("engagement_score_milli").notNull(),
+    shareBps: integer("share_bps").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    /** Per-video view counts that contributed. */
+    breakdown: jsonb("breakdown").notNull(),
+    payoutId: uuid("payout_id").references(() => creatorPayouts.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("pool_shares_calculation_creator_idx").on(t.calculationId, t.creatorId),
+    index("pool_shares_creator_payout_idx").on(t.creatorId, t.payoutId),
+  ],
+);

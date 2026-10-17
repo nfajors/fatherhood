@@ -16,7 +16,7 @@ Fatherhood.School is a subscription-based online academy for fathers and aspirin
 - **Community Voices (Free):** User-submitted short videos from approved creators, free to view (to drive awareness and funnel to paid).
 - Robust creator upload system with standardized branding (watermarks, intros/outros).
 - Video ratings and reviews.
-- Creator revenue share: 55% of attributable operating profit.
+- Creator revenue share: 25% of subscription revenue funds a creator pool, split by engagement (Winning Careers model; see 3.5).
 - AI + human moderation.
 - Gift memberships.
 - Integration with book launch (excerpts, author-led courses, companion materials).
@@ -158,39 +158,54 @@ Two distinct sections:
 **Policies:** Content must be constructive, non-political in the culture-war sense unless directly tied to fatherhood evidence, respectful of mothers/co-parents, no medical/legal advice without disclaimers.
 
 ### 3.5 Revenue Sharing Model (Detailed)
-**Principle:** Creators receive 55% of the *operating profit attributable to their video*.
 
-**Definitions (to be implemented precisely):**
-- **Gross Revenue Pool:** All subscription revenue (monthly + annual) in a period (monthly or quarterly settlement).
-- **Variable Costs Allocated:**
-  - Stripe fees (~2.9% + $0.30, or exact).
-  - Cloudflare Stream storage + delivery costs allocated proportionally by minutes delivered.
-  - Payment processing, refunds, chargebacks.
-- **Operating Profit (OP) for Content Pool:** Gross subscription revenue − variable costs − a fixed platform overhead allocation (recommend 25–35% of remaining for platform, marketing, ops, development reserve). The remaining is the “Content OP Pool.”
-- **Attribution:**
-  - Primary metric: Minutes watched (or views weighted by completion rate).
-  - Secondary: Ratings (higher-rated content gets small multiplier, e.g., 1.0–1.2x).
-  - Each video’s share of total minutes watched determines its share of the Content OP Pool.
-- **Creator Payout:** 55% of the video’s attributed OP.
-- **Platform retains:** 45% of attributed OP + all overhead.
+> **Revised October 17, 2026.** The original model (creators receive 55% of the operating
+> profit attributable to their videos, by minutes watched) is replaced by the membership-pool
+> model used by Winning Careers. Implemented in `src/lib/revenue/` (policy constants in
+> `policy.ts`).
 
-**Example Calculation (illustrative):**
-- Monthly gross: $20,000
-- Variable costs: $2,000
-- Overhead allocation (30%): $5,400
-- Content OP Pool: $12,600
-- Video A accounts for 5% of minutes watched → attributed OP $630
-- Creator receives 55% × $630 = $346.50
+**Principle:** A fixed share of subscription revenue funds a creator pool each month. The pool
+is divided among eligible creators in proportion to an engagement score that rewards both
+posting regularly and drawing viewers.
 
-**Implementation Notes for Claude Code:**
-- Track watch time per user per video (Cloudflare Stream analytics + internal events).
-- Monthly settlement job.
-- Creator dashboard shows estimated and actual payouts.
-- Minimum payout threshold ($50) and Stripe Connect or ACH for payouts.
-- Transparent reporting so creators understand the model.
-- Professional course creators (including author) participate in the same system or a separate higher-share tier if desired (decide later; default to same for simplicity).
+**Pool:**
+- **Revenue base:** paid subscription invoices (monthly and annual) in the settlement month,
+  recorded from Stripe `invoice.paid` events. Gift purchases will be added to the same ledger.
+- **Creator pool:** 25% of that revenue. The platform keeps 75% for operations, payment
+  fees, video delivery, marketing and development.
 
-This model is fair, aligns incentives with quality and engagement, and scales with company success.
+**Eligibility (per creator, per month):**
+- At least 1 approved video published in the current calendar quarter (quarter to date).
+- At least 1 video with 10 or more counted views in the month.
+- A view counts only when the viewer watches at least 30 seconds.
+
+**Engagement score (0 to 100):**
+- 50% videos-posted score: 5 points per approved video published in the quarter, capped at
+  100 (20 videos).
+- 50% views score: 1 point per 10 counted views in the month, capped at 100 (1,000 views).
+- Only videos that reached 10 counted views contribute views.
+
+**Split:** each eligible creator receives `pool × (their score ÷ sum of all scores)`. Shares
+are rounded to the cent and any rounding difference is applied to the largest share, so the
+pool is always fully allocated.
+
+**Example Calculation:**
+- Monthly subscription revenue: $20,000 → creator pool (25%): $5,000
+- Creator A: 10 videos this quarter (50 pts), 2,000 views (capped at 100 pts) → score 75
+- Creator B: 2 videos (10 pts), 500 views (50 pts) → score 30
+- Creator C: 1 video (5 pts), 100 views (10 pts) → score 7.5
+- Total score 112.5 → A $3,333.34, B $1,333.33, C $333.33
+
+**Payouts:**
+- Monthly settlement (`npm run revenue:settle -- YYYY-MM`) records each creator's share.
+- Balances of $20 or more become a payout; smaller balances carry forward until they reach $20.
+- Payouts are recorded as pending and sent manually at first; Stripe Connect automation is Phase 2.
+- Creator dashboard shows estimated and actual payouts, with the per-video view breakdown.
+- Professional course creators (including the author) participate in the same pool.
+
+**Things to watch:** because both components are capped, creators who post 20+ videos a
+quarter and draw 1,000+ views a month all score 100 and split evenly. Review the caps once
+real engagement data exists.
 
 ## 4. Revenue Model & Projections
 
@@ -285,7 +300,7 @@ This model is fair, aligns incentives with quality and engagement, and scales wi
 - Basic search, categories, free/paid gates.
 - Creator dashboard (basic).
 - Admin moderation tools.
-- Revenue share calculation (backend, even if payouts manual at first).
+- Revenue share calculation (backend, even if payouts manual at first): Winning Careers pool model, see 3.5.
 
 **Phase 2 – Growth (Months 4–9)**
 - Enhanced community (comments, better discovery).
@@ -328,11 +343,11 @@ This model is fair, aligns incentives with quality and engagement, and scales wi
 - Book sales attribution.
 
 ## 9. Open Decisions & Recommendations
-- **Default recommendation:** Start with annual-heavy marketing and the revenue share model as defined.
+- **Default recommendation:** Start with annual-heavy marketing and the revenue share model as defined (Winning Careers pool model, 3.5).
 - **Video length (Community):** 8 minutes hard max.
 - **Guarantee:** 7 days.
 - **First professional courses:** Prioritize book-aligned content for launch.
-- **Overhead allocation:** Start at 30% until real data; review quarterly.
+- **Creator pool share:** 25% of subscription revenue (Winning Careers model); review quarterly.
 - **Name the free section:** “Community Voices” or “Dad Voices.”
 
 This plan is comprehensive, actionable, and aligned with the stated vision, pricing, revenue targets, and technical constraints. Claude Code should treat this as the source of truth and implement with production-quality code, clear comments, and modular architecture.
