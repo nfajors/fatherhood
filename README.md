@@ -30,6 +30,7 @@ npm run dev                  # http://localhost:3000
 | `npm run db:migrate` | Apply migrations |
 | `npm run themes:seed` | Add or update the starting themes from the book (never overwrites admin edits) |
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
+| `npm run gifts:deliver` | Send scheduled gift emails that are due, and retry failed sends |
 | `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
 
 Environment variables are validated per integration when first used
@@ -39,6 +40,13 @@ Environment variables are validated per integration when first used
 
 **Anthropic (AI themes).** Set `ANTHROPIC_API_KEY` to turn on the theme classifier.
 Without it the site works normally and content waits, unthemed, for an admin.
+
+**Email (Resend).** Set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in
+Resend). Without a key, emails are printed to the server log instead of sent.
+
+**Scheduled jobs.** Set `CRON_SECRET`. `vercel.json` calls `/api/cron/gift-delivery` hourly on
+Vercel; on other hosts, call it hourly with `Authorization: Bearer $CRON_SECRET` or run
+`npm run gifts:deliver`.
 
 **Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
 
@@ -51,7 +59,8 @@ Paid access is not a role: it is derived from the `subscriptions` table.
 1. Create a product with two recurring prices ($19/month, $199/year) and set
    `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL`.
 2. Add a webhook endpoint at `/api/stripe/webhook` for `checkout.session.completed`,
-   `customer.subscription.*` and `invoice.paid`, then set `STRIPE_WEBHOOK_SECRET`.
+   `checkout.session.async_payment_succeeded`, `customer.subscription.*`, `invoice.paid`
+   and `charge.refunded`, then set `STRIPE_WEBHOOK_SECRET`.
    Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 3. Turn on the customer portal (members manage billing from `/account`).
 
@@ -117,6 +126,25 @@ on `/themes` for members and `/admin/themes` for admins.
 
 Tuning lives in `src/lib/themes/policy.ts`.
 
+## Gift memberships
+
+`/gift` sells 1 year ($199) or 1 month ($19) as a gift; `/redeem` redeems it. Code in
+`src/lib/gifts/`.
+
+- **Buying** needs no account. The buyer picks how the code reaches the recipient: emailed
+  now, emailed at 8 a.m. (buyer's time) on a chosen date, or handed over in person. Payment
+  is a one-time Stripe Checkout. The buyer gets a confirmation with the code either way.
+- **Codes** look like `FATHER-ABCD-2345`, avoid look-alike characters, and accept any
+  spacing or case. They don't expire.
+- **Payment** is confirmed by the Stripe webhook, or by the thank-you page if it arrives
+  first; whichever is first sends the emails, exactly once. Gift revenue goes into the
+  creator-pool ledger like subscription revenue.
+- **Redeeming** needs an account. Without a paid subscription, a gift membership period starts
+  (after any time the member already has, so gifts stack). An auto-renewing subscriber gets
+  the gift's value as Stripe billing credit instead, which pays their next renewals.
+- **Refunds:** a full refund in Stripe voids the gift: an unused code stops working, gift
+  membership time ends, or billing credit is reversed.
+
 ## Creator revenue share
 
 Same model as Winning Careers (details in plan section 3.5, constants in
@@ -144,8 +172,8 @@ at upload time.
 
 Done: project scaffold, schema and migrations, auth, membership checkout and
 billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
-pages, creator revenue-share settlement, AI themes.
+pages, creator revenue-share settlement, AI themes, gift memberships.
 
 Next (Phase 1): admin moderation queue and AI pre-screen, course catalog and player
 UI, creator upload UI and dashboard (including earnings), ratings and progress
-tracking, gift memberships, search.
+tracking, search.

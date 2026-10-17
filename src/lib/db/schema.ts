@@ -139,27 +139,55 @@ export const subscriptions = pgTable(
 );
 
 export const giftStatus = pgEnum("gift_status", ["pending_payment", "paid", "redeemed", "refunded"]);
+export type GiftStatus = (typeof giftStatus.enumValues)[number];
+
+/** email: we email the code to the recipient (now or on deliverAt); self: the purchaser hands it over. */
+export const giftDelivery = pgEnum("gift_delivery", ["email", "self"]);
+
+/** access: a gift membership period; billing_credit: Stripe balance credit for an existing subscriber. */
+export const giftRedemption = pgEnum("gift_redemption", ["access", "billing_credit"]);
 
 export const gifts = pgTable(
   "gifts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Redemption code, stored formatted (FATHER-XXXX-XXXX). */
     code: text("code").notNull().unique(),
+    /** "annual" or "monthly": what the gift is worth. */
     plan: subscriptionPlan("plan").notNull(),
     status: giftStatus("status").notNull().default("pending_payment"),
     amountCents: integer("amount_cents").notNull(),
     purchaserUserId: text("purchaser_user_id").references(() => user.id, { onDelete: "set null" }),
     purchaserEmail: text("purchaser_email").notNull(),
-    recipientEmail: text("recipient_email").notNull(),
-    recipientName: text("recipient_name"),
+    /** How the gift is signed, e.g. "Dad" or "Your brother Marcus". */
+    purchaserName: text("purchaser_name").notNull(),
+    delivery: giftDelivery("delivery").notNull(),
+    /** Required for email delivery. */
+    recipientEmail: text("recipient_email"),
+    recipientName: text("recipient_name").notNull(),
     message: text("message"),
+    /** Email delivery date; null means as soon as payment clears. */
+    deliverAt: timestamp("deliver_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    deliveryError: text("delivery_error"),
     stripeCheckoutSessionId: text("stripe_checkout_session_id").unique(),
+    stripePaymentIntentId: text("stripe_payment_intent_id").unique(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     redeemedByUserId: text("redeemed_by_user_id").references(() => user.id, { onDelete: "set null" }),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
-    deliverAt: timestamp("deliver_at", { withTimezone: true }),
+    redemption: giftRedemption("redemption"),
+    /** The membership period created on redemption (redemption = access). */
+    subscriptionId: uuid("subscription_id").references(() => subscriptions.id, { onDelete: "set null" }),
+    /** The Stripe balance transaction created on redemption (redemption = billing_credit). */
+    stripeBalanceTransactionId: text("stripe_balance_transaction_id"),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("gifts_purchaser_user_id_idx").on(t.purchaserUserId)],
+  (t) => [
+    index("gifts_purchaser_user_id_idx").on(t.purchaserUserId),
+    index("gifts_delivery_due_idx").on(t.status, t.deliveredAt),
+    check("gifts_email_delivery_has_recipient", sql`${t.delivery} <> 'email' or ${t.recipientEmail} is not null`),
+  ],
 );
 
 /** Stripe and Cloudflare event ids already handled, so webhook retries are no-ops. */

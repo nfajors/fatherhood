@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getDb } from "@/lib/db";
 import { processedWebhookEvents, revenueLedger, subscriptions, user } from "@/lib/db/schema";
 import { stripeEnv } from "@/lib/env";
+import { recordGiftPayment, sendGiftEmails, stripeCredits } from "@/lib/gifts/runtime";
+import { refundGiftPayment } from "@/lib/gifts/service";
 import { getStripe, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
 
 const SUBSCRIPTION_EVENTS = new Set([
@@ -16,8 +18,9 @@ const SUBSCRIPTION_EVENTS = new Set([
 
 /**
  * Stripe webhook: keeps `subscriptions` in sync, which is what grants access,
- * and records paid subscription invoices in the revenue ledger that funds the
- * creator pool. Each event id is recorded so Stripe's retries are processed once.
+ * records paid subscription invoices in the revenue ledger that funds the
+ * creator pool, and fulfils and refunds gift memberships. Each event id is
+ * recorded so Stripe's retries are processed once.
  */
 export async function POST(request: Request) {
   const env = stripeEnv();
@@ -29,6 +32,24 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(rawBody, request.headers.get("stripe-signature") ?? "", env.STRIPE_WEBHOOK_SECRET);
   } catch {
     return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
+  }
+
+  // Gift handlers are idempotent on their own, so they run before (not inside) the
+  // processed-event record: if one throws, Stripe gets a 500 and retries.
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    const paid = await recordGiftPayment(event.data.object as Stripe.Checkout.Session);
+    if (paid) {
+      after(() => sendGiftEmails(paid));
+      return NextResponse.json({ received: true });
+    }
+  }
+  if (event.type === "charge.refunded") {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+    if (paymentIntentId) {
+      await refundGiftPayment(getDb(), { paymentIntentId, fullyRefunded: charge.refunded }, stripeCredits);
+    }
+    return NextResponse.json({ received: true });
   }
 
   const db = getDb();

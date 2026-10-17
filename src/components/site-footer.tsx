@@ -8,8 +8,10 @@ export function SiteFooter() {
         <p>
           © {new Date().getFullYear()} {SITE.name}. Companion academy to <em>{SITE.bookTitle}</em>.
         </p>
-        <nav aria-label="Footer" className="flex gap-5">
+        <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2 whitespace-nowrap">
           <Link href="/pricing">Pricing</Link>
+          <Link href="/gift">Give a gift</Link>
+          <Link href="/redeem">Redeem a gift</Link>
           <Link href="/book">The Book</Link>
           <Link href="/community">Community Voices</Link>
         </nav>

@@ -102,6 +102,8 @@ Two distinct sections:
   - Monthly: $19.
   - 7-day money-back guarantee.
   - Gift memberships: Purchase as gift (email delivery of code or direct account provisioning). Stripe-powered.
+    *Built October 17, 2026:* email now, on a chosen date, or hand over the code yourself; redeeming
+    gives a gift membership period, or billing credit for existing subscribers. See the README.
   - Family / multi-seat options (future, Year 2+).
 - **Video Player (Cloudflare Stream):**
   - Adaptive bitrate, captions (AI-generated + editable).
