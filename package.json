@@ -20,7 +20,8 @@
     "db:studio": "drizzle-kit studio",
     "revenue:settle": "tsx --env-file-if-exists=.env.local scripts/settle-revenue.ts",
     "themes:seed": "tsx --env-file-if-exists=.env.local scripts/themes-seed.ts",
-    "themes:assign": "tsx --env-file-if-exists=.env.local scripts/themes-assign.ts"
+    "themes:assign": "tsx --env-file-if-exists=.env.local scripts/themes-assign.ts",
+    "gifts:deliver": "tsx --env-file-if-exists=.env.local scripts/gifts-deliver.ts"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.1",
@@ -50,6 +51,7 @@
     "postgres": "3.4.9",
     "react": "19.1.10",
     "react-dom": "19.1.10",
+    "resend": "6.34.1",
     "stripe": "18.5.0",
     "tailwind-merge": "3.3.1",
     "zod": "4.1.12"

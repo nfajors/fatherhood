@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { MONEY_BACK_GUARANTEE_DAYS, PLANS } from "@/lib/config";
@@ -51,7 +52,13 @@ export default function PricingPage() {
           </li>
         ))}
       </ul>
-      <p className="mt-8 text-sm text-muted">Gift memberships are coming soon.</p>
+      <p className="mt-8 text-muted">
+        Know a father who&apos;d love this?{" "}
+        <Link href="/gift" className="font-semibold text-navy-900 underline underline-offset-4">
+          Give a membership as a gift
+        </Link>
+        .
+      </p>
     </div>
   );
 }

@@ -42,3 +42,12 @@ export const CATEGORIES = [
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
+
+/** Gift memberships are sold at the same prices as the plans they mirror. */
+export const GIFT_TERMS: Record<PlanId, { label: string; months: number }> = {
+  annual: { label: "1 year", months: 12 },
+  monthly: { label: "1 month", months: 1 },
+};
+
+/** Longest personal message on a gift. */
+export const GIFT_MESSAGE_MAX_CHARS = 500;
