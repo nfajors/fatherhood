@@ -126,8 +126,8 @@ Two distinct sections:
   - Full-text search across titles, descriptions, transcripts.
   - Categories: Expectant, New Dads, School-age, Teens, Co-parenting, Presence, Discipline, Work-Family, Research, Personal Stories, etc.
   - Curated playlists (e.g., “Start Here,” “Book Companion”).
-  - **Themes** (added October 17, 2026): topical collections such as “Choosing a Partner,”
-    seeded from the book. AI places every video and course in up to three themes and
+  - **Themes** (added October 17, 2026): 13 topical collections drawn from the book, such as
+    “Choosing a Partner,” “Presence” and “Grow the Tree You Have.” AI places every video and course in up to three themes and
     proposes new themes for admin approval when nothing fits. See the README.
 
 

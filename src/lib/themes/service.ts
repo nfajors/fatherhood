@@ -8,7 +8,7 @@ import type { Database } from "@/lib/db";
 import { courseModules, courses, lessons, themeAssignments, themes, videos, type ThemeStatus } from "@/lib/db/schema";
 import type { ContentForTheming, ThemeClassifier } from "./classifier";
 import { resolveClassification, slugify, type CatalogTheme } from "./resolve";
-import { SEED_THEMES } from "./seed";
+import { SEED_THEMES, SUPERSEDED_SEED_THEMES } from "./seed";
 
 export type ThemeTarget = { kind: "video"; id: string } | { kind: "course"; id: string };
 
@@ -28,24 +28,65 @@ function targetValues(target: ThemeTarget) {
   return target.kind === "video" ? { videoId: target.id } : { courseId: target.id };
 }
 
-/** Insert the starting themes that don't exist yet. Returns the slugs added. */
-export async function seedThemes(db: Database): Promise<string[]> {
-  const inserted = await db
-    .insert(themes)
-    .values(
-      SEED_THEMES.map((t, i) => ({
-        slug: t.slug,
-        name: t.name,
-        description: t.description,
-        bookReference: t.bookReference ?? null,
-        status: "active" as const,
-        origin: "book" as const,
-        sortOrder: (i + 1) * 10,
-      })),
-    )
-    .onConflictDoNothing({ target: themes.slug })
-    .returning({ slug: themes.slug });
-  return inserted.map((r) => r.slug);
+export type SeedResult = { added: string[]; upgraded: string[] };
+
+/**
+ * Bring the starting themes up to date: upgrade rows that still match an earlier
+ * seed version exactly (renaming in place keeps their placements), then insert
+ * any seed theme that doesn't exist. Themes an admin has edited are left alone.
+ */
+export async function seedThemes(db: Database): Promise<SeedResult> {
+  return db.transaction(async (tx) => {
+    const order = new Map(SEED_THEMES.map((t, i) => [t.slug, (i + 1) * 10]));
+    const bySlug = new Map(SEED_THEMES.map((t) => [t.slug, t]));
+    const upgraded: string[] = [];
+
+    for (const old of SUPERSEDED_SEED_THEMES) {
+      const next = bySlug.get(old.replacedBy);
+      if (!next) continue;
+      if (old.slug !== next.slug) {
+        const [taken] = await tx.select({ id: themes.id }).from(themes).where(eq(themes.slug, next.slug));
+        if (taken) continue;
+      }
+      const updated = await tx
+        .update(themes)
+        .set({
+          slug: next.slug,
+          name: next.name,
+          description: next.description,
+          bookReference: next.bookReference ?? null,
+          sortOrder: order.get(next.slug) ?? 0,
+        })
+        .where(
+          and(
+            eq(themes.slug, old.slug),
+            eq(themes.name, old.name),
+            eq(themes.description, old.description),
+            eq(themes.origin, "book"),
+          ),
+        )
+        .returning({ slug: themes.slug });
+      upgraded.push(...updated.map((r) => r.slug));
+    }
+
+    const inserted = await tx
+      .insert(themes)
+      .values(
+        SEED_THEMES.map((t) => ({
+          slug: t.slug,
+          name: t.name,
+          description: t.description,
+          bookReference: t.bookReference ?? null,
+          status: "active" as const,
+          origin: "book" as const,
+          sortOrder: order.get(t.slug) ?? 0,
+        })),
+      )
+      .onConflictDoNothing({ target: themes.slug })
+      .returning({ slug: themes.slug });
+
+    return { added: inserted.map((r) => r.slug), upgraded };
+  });
 }
 
 /** Load the classifier input for a video or course; null if it doesn't exist. */

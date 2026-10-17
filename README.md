@@ -28,7 +28,7 @@ npm run dev                  # http://localhost:3000
 | `npm run typecheck` / `lint` | TypeScript and ESLint |
 | `npm run db:generate` | Generate a migration after editing `src/lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
-| `npm run themes:seed` | Add the starting themes (never overwrites existing ones) |
+| `npm run themes:seed` | Add or update the starting themes from the book (never overwrites admin edits) |
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
 
@@ -102,9 +102,9 @@ visible only to their creator and admins.
 Themes organize every video and course by topic (for example "Choosing a Partner"),
 on `/themes` for members and `/admin/themes` for admins.
 
-- **Starting themes** come from `src/lib/themes/seed.ts` (`npm run themes:seed`). The
-  current ten are provisional, drawn from the development plan's description of the
-  book, and should be replaced with themes from the book draft.
+- **Starting themes** come from `src/lib/themes/seed.ts` (`npm run themes:seed`): 13 themes
+  drawn from the *Fatherhood in Focus* draft (revised July 2026), each citing its chapters.
+  Re-running the seed adds new themes and updates unedited ones, never admin edits.
 - **AI placement** (`src/lib/themes/classifier.ts`, Claude with structured output): each
   video is classified when it finishes processing, before review. It goes into up to 3
   themes, each with a confidence and a one-line reason. Placements under 55% are dropped.
