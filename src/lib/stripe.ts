@@ -66,3 +66,26 @@ export function toSubscriptionRecord(
     cancelAtPeriodEnd: sub.cancel_at_period_end,
   };
 }
+
+export type LedgerEntry = {
+  stripeInvoiceId: string;
+  stripeCustomerId: string;
+  amountCents: number;
+  paidAt: Date;
+};
+
+/**
+ * Revenue-ledger entry for a paid subscription invoice, or null for invoices
+ * that are not subscription revenue (one-off invoices, $0 invoices).
+ */
+export function toLedgerEntry(invoice: Stripe.Invoice): LedgerEntry | null {
+  if (!invoice.id || !invoice.billing_reason?.startsWith("subscription")) return null;
+  if (invoice.amount_paid <= 0 || !invoice.customer) return null;
+  const paidAt = invoice.status_transitions?.paid_at ?? invoice.created;
+  return {
+    stripeInvoiceId: invoice.id,
+    stripeCustomerId: typeof invoice.customer === "string" ? invoice.customer : invoice.customer.id,
+    amountCents: invoice.amount_paid,
+    paidAt: new Date(paidAt * 1000),
+  };
+}

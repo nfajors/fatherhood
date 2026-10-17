@@ -24,10 +24,11 @@ npm run dev                  # http://localhost:3000
 | Script | What it does |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js dev server, production build, production server |
-| `npm test` / `test:coverage` | Unit tests (Vitest) |
+| `npm test` / `test:coverage` | Unit tests (Vitest); set `TEST_DATABASE_URL` to a disposable database to also run the Postgres integration tests |
 | `npm run typecheck` / `lint` | TypeScript and ESLint |
 | `npm run db:generate` | Generate a migration after editing `src/lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
+| `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
 
 Environment variables are validated per integration when first used
 (`src/lib/env.ts`), so the app builds and tests run without secrets.
@@ -44,8 +45,8 @@ Paid access is not a role: it is derived from the `subscriptions` table.
 **Stripe.**
 1. Create a product with two recurring prices ($19/month, $199/year) and set
    `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL`.
-2. Add a webhook endpoint at `/api/stripe/webhook` for `checkout.session.completed`
-   and `customer.subscription.*`, then set `STRIPE_WEBHOOK_SECRET`.
+2. Add a webhook endpoint at `/api/stripe/webhook` for `checkout.session.completed`,
+   `customer.subscription.*` and `invoice.paid`, then set `STRIPE_WEBHOOK_SECRET`.
    Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 3. Turn on the customer portal (members manage billing from `/account`).
 
@@ -91,19 +92,35 @@ everyone; approved Professional videos need an active membership (or a preview
 lesson) and always play through a short-lived signed token; unapproved videos are
 visible only to their creator and admins.
 
+## Creator revenue share
+
+Same model as Winning Careers (details in plan section 3.5, constants in
+`src/lib/revenue/policy.ts`):
+
+- 25% of each month's paid subscription revenue funds the creator pool.
+- Eligible creators posted at least 1 approved video this quarter and have a video with
+  10+ views this month (a view = 30+ seconds watched).
+- Score = 50% videos posted (5 pts each, max 100) + 50% views (1 pt per 10, max 100);
+  the pool is split in proportion to score.
+- Balances of $20+ become pending payouts; smaller balances carry forward.
+
+Run `npm run revenue:settle` monthly (e.g. on the 1st). Re-running a settled month
+returns the stored result; `--force` recalculates it unless it has already been paid out.
+
 ## Code reused from Winning
 
-The Stream client, review-history model and entitlement approach were ported from
-`winning-backend-staging` (Python) to TypeScript. Two parts were corrected on the
-way, because the original does not match Cloudflare's API: playback tokens are
+The Stream client, review-history model, entitlement approach and revenue-pool
+policy were ported from `winning-backend-staging` (Python) to TypeScript. Two
+Stream parts were corrected on the way, because the original does not match Cloudflare's API: playback tokens are
 RS256 JWTs signed with a Stream signing key, and watermarks are applied by profile
 at upload time.
 
 ## Status
 
 Done: project scaffold, schema and migrations, auth, membership checkout and
-billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing pages.
+billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
+pages, creator revenue-share settlement.
 
 Next (Phase 1): admin moderation queue and AI pre-screen, course catalog and player
-UI, creator upload UI and dashboard, ratings and progress tracking, gift memberships,
-creator revenue share, search.
+UI, creator upload UI and dashboard (including earnings), ratings and progress
+tracking, gift memberships, search.

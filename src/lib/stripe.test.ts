@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
-import { planForPriceId, toSubscriptionRecord } from "./stripe";
+import { planForPriceId, toLedgerEntry, toSubscriptionRecord } from "./stripe";
 
 const prices = { monthly: "price_monthly", annual: "price_annual" };
 
@@ -58,5 +58,42 @@ describe("toSubscriptionRecord", () => {
     expect(toSubscriptionRecord(subscription({ items: { data: [] } }), prices)).toBeNull();
     expect(toSubscriptionRecord(subscription({}, { price: { id: "price_other" } }), prices)).toBeNull();
     expect(toSubscriptionRecord(subscription({}, { current_period_end: undefined }), prices)).toBeNull();
+  });
+});
+
+describe("toLedgerEntry", () => {
+  const invoice = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: "in_1",
+      billing_reason: "subscription_cycle",
+      amount_paid: 199_00,
+      customer: "cus_1",
+      created: 1_790_000_000,
+      status_transitions: { paid_at: 1_790_000_500 },
+      ...overrides,
+    }) as unknown as Stripe.Invoice;
+
+  it("records paid subscription invoices at their paid time", () => {
+    expect(toLedgerEntry(invoice())).toEqual({
+      stripeInvoiceId: "in_1",
+      stripeCustomerId: "cus_1",
+      amountCents: 199_00,
+      paidAt: new Date(1_790_000_500 * 1000),
+    });
+    expect(toLedgerEntry(invoice({ billing_reason: "subscription_create", customer: { id: "cus_2" } }))).toMatchObject({
+      stripeCustomerId: "cus_2",
+    });
+  });
+
+  it("falls back to the creation time when paid_at is missing", () => {
+    expect(toLedgerEntry(invoice({ status_transitions: {} }))?.paidAt).toEqual(new Date(1_790_000_000 * 1000));
+  });
+
+  it("skips non-subscription, zero-value and customerless invoices", () => {
+    expect(toLedgerEntry(invoice({ billing_reason: "manual" }))).toBeNull();
+    expect(toLedgerEntry(invoice({ billing_reason: null }))).toBeNull();
+    expect(toLedgerEntry(invoice({ amount_paid: 0 }))).toBeNull();
+    expect(toLedgerEntry(invoice({ customer: null }))).toBeNull();
+    expect(toLedgerEntry(invoice({ id: undefined }))).toBeNull();
   });
 });
