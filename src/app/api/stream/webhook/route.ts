@@ -5,6 +5,8 @@ import { getDb } from "@/lib/db";
 import { videoReviews, videos } from "@/lib/db/schema";
 import { streamEnv } from "@/lib/env";
 import { verifyStreamWebhook, type StreamVideo } from "@/lib/stream";
+import { reviewDueAt } from "@/lib/moderation/decide";
+import { startScreening } from "@/lib/moderation/runtime";
 import { themeInBackground } from "@/lib/themes/runtime";
 
 /**
@@ -40,7 +42,6 @@ export async function POST(request: Request) {
       toStatus = "rejected";
       notes = "Community Voices videos must be 8 minutes or shorter.";
     } else {
-      // AI pre-screening hooks in here (next milestone); until then, humans review everything.
       toStatus = "pending_review";
     }
   } else {
@@ -50,7 +51,12 @@ export async function POST(request: Request) {
   await db.transaction(async (tx) => {
     await tx
       .update(videos)
-      .set({ status: toStatus, durationSeconds, thumbnailUrl: payload.thumbnail ?? null })
+      .set({
+        status: toStatus,
+        durationSeconds,
+        thumbnailUrl: payload.thumbnail ?? null,
+        reviewDueAt: toStatus === "pending_review" ? reviewDueAt(video.type, new Date()) : null,
+      })
       .where(eq(videos.id, video.id));
     if (toStatus !== video.status && toStatus !== "processing") {
       await tx.insert(videoReviews).values({
@@ -63,8 +69,14 @@ export async function POST(request: Request) {
     }
   });
 
-  // Theme it now so reviewers see suggested themes alongside the video.
-  if (toStatus === "pending_review") after(() => themeInBackground({ kind: "video", id: video.id }));
+  // Into the review queue: suggest themes for the reviewer and start the AI
+  // screen (which first asks Stream for captions; the moderation cron finishes it).
+  if (toStatus === "pending_review") {
+    after(async () => {
+      await themeInBackground({ kind: "video", id: video.id });
+      await startScreening(video.id);
+    });
+  }
 
   return NextResponse.json({ received: true });
 }

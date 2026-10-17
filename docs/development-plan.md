@@ -161,6 +161,10 @@ Two distinct sections:
    - User reports → AI + human escalation.
    - Ability to unpublish or restrict.
 
+*Built October 17, 2026:* the AI pre-screen uses Claude (transcript from Stream captions plus
+video frames) rather than the OpenAI Moderation API; auto-approval additionally requires a
+transcript and an earlier human-approved video from the same creator. See the README.
+
 **Policies:** Content must be constructive, non-political in the culture-war sense unless directly tied to fatherhood evidence, respectful of mothers/co-parents, no medical/legal advice without disclaimers.
 
 ### 3.5 Revenue Sharing Model (Detailed)
