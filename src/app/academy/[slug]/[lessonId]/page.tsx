@@ -1,0 +1,143 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { LessonPlayer } from "@/components/video/lesson-player";
+import { PlayerUnavailable } from "@/components/video/video-player";
+import { ReportButton } from "@/components/video/report-button";
+import { getSessionUser } from "@/lib/auth";
+import { getCourseOutline, lessonNavigation } from "@/lib/courses/catalog";
+import { getDb } from "@/lib/db";
+import { formatDuration } from "@/lib/format";
+import { accessFor, loadViewer, playbackSource } from "@/lib/playback/access";
+import { resumeAt } from "@/lib/playback/progress";
+
+export const dynamic = "force-dynamic";
+
+type Params = { params: Promise<{ slug: string; lessonId: string }> };
+
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { slug, lessonId } = await params;
+  const outline = await getCourseOutline(getDb(), slug, null);
+  const lesson = outline?.flat.find((l) => l.id === lessonId);
+  return lesson && outline ? { title: `${lesson.title} | ${outline.course.title}` } : {};
+}
+
+export default async function LessonPage({ params }: Params) {
+  const { slug, lessonId } = await params;
+  if (!z.uuid().safeParse(lessonId).success) notFound();
+  const db = getDb();
+  const sessionUser = await getSessionUser().catch(() => null);
+  const outline = await getCourseOutline(db, slug, sessionUser?.id ?? null);
+  if (!outline) notFound();
+  const nav = lessonNavigation(outline, lessonId);
+  if (!nav.lesson || !nav.lesson.available || !nav.lesson.videoId) notFound();
+  const lesson = nav.lesson;
+
+  const video = await db.query.videos.findFirst({ where: (v, { eq }) => eq(v.id, lesson.videoId!) });
+  if (!video) notFound();
+  const decision = await accessFor(db, video, await loadViewer(db, sessionUser));
+  const source = decision.allowed ? await playbackSource(video, decision) : null;
+  const returnTo = `/academy/${slug}/${lessonId}`;
+
+  return (
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_320px]">
+      <div className="min-w-0">
+        <Link href={`/academy/${slug}`} className="text-sm text-muted underline">
+          ← {outline.course.title}
+        </Link>
+        <div className="mt-4">
+          {!decision.allowed ? (
+            <div className="flex aspect-video flex-col items-center justify-center rounded-xl bg-navy-950 p-6 text-center text-white">
+              <p className="font-serif text-2xl">This lesson is for members</p>
+              <p className="mt-2 max-w-md text-white/75">Join to watch every lesson in every course, with new courses each month.</p>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Button asChild>
+                  <Link href="/pricing">See membership</Link>
+                </Button>
+                {decision.reason === "sign_in_required" && (
+                  <Button asChild variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                    <Link href={`/sign-in?next=${encodeURIComponent(returnTo)}`}>Sign in</Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : source ? (
+            <LessonPlayer
+              videoId={video.id}
+              src={source.src}
+              customerCode={source.customerCode}
+              title={lesson.title}
+              poster={video.thumbnailUrl}
+              startAt={resumeAt(lesson.positionSeconds, video.durationSeconds, lesson.completed)}
+              initialCompleted={lesson.completed}
+              canTrack={Boolean(sessionUser)}
+              next={nav.next ? { href: `/academy/${slug}/${nav.next.id}`, title: nav.next.title } : null}
+            />
+          ) : (
+            <PlayerUnavailable poster={video.thumbnailUrl} />
+          )}
+        </div>
+        <p className="mt-6 text-sm text-muted">
+          {nav.moduleTitle} · Lesson {nav.position} of {nav.count}
+          {video.durationSeconds ? ` · ${formatDuration(video.durationSeconds)}` : ""}
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold">{lesson.title}</h1>
+        {lesson.summary && <p className="mt-3 text-lg text-ink">{lesson.summary}</p>}
+        {lesson.resources.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold">Lesson materials</h2>
+            <ul className="mt-2 list-disc pl-5 text-ink">
+              {lesson.resources.map((r) => (
+                <li key={r.id}>{r.title}</li>
+              ))}
+            </ul>
+            <p className="mt-1 text-sm text-muted">Downloads are coming soon.</p>
+          </div>
+        )}
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-navy-900/10 pt-6">
+          {nav.previous ? (
+            <Link href={`/academy/${slug}/${nav.previous.id}`} className="text-sm text-navy-900 underline underline-offset-4">
+              ← {nav.previous.title}
+            </Link>
+          ) : (
+            <span />
+          )}
+          {decision.allowed && <ReportButton videoId={video.id} signedIn={Boolean(sessionUser)} returnTo={returnTo} />}
+        </div>
+      </div>
+
+      <aside aria-label="Course outline" className="lg:sticky lg:top-6 lg:self-start">
+        <div className="rounded-xl border border-navy-900/10 bg-white">
+          <p className="border-b border-navy-900/10 p-4 font-semibold">{outline.course.title}</p>
+          <ol className="max-h-[70vh] overflow-y-auto py-2 text-sm">
+            {outline.modules.map((mod) => (
+              <li key={mod.id}>
+                <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-widest text-muted">{mod.title}</p>
+                <ol>
+                  {mod.lessons
+                    .filter((l) => l.available)
+                    .map((l) => (
+                      <li key={l.id}>
+                        <Link
+                          href={`/academy/${slug}/${l.id}`}
+                          aria-current={l.id === lessonId ? "page" : undefined}
+                          className={`flex gap-2 px-4 py-2 hover:bg-paper ${l.id === lessonId ? "bg-gold-100 font-semibold" : ""}`}
+                        >
+                          <span aria-hidden className="w-4 shrink-0 text-gold-600">
+                            {l.completed ? "✓" : ""}
+                          </span>
+                          <span className="min-w-0 flex-1">{l.title}</span>
+                        </Link>
+                      </li>
+                    ))}
+                </ol>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </aside>
+    </div>
+  );
+}

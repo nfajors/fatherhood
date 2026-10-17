@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { HeaderAccount } from "@/components/header-account";
 import { SITE } from "@/lib/config";
 
 const NAV = [
@@ -25,14 +25,7 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
-            <Link href="/sign-in">Sign in</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/pricing">Join</Link>
-          </Button>
-        </div>
+        <HeaderAccount />
       </div>
     </header>
   );

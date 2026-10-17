@@ -108,7 +108,9 @@ Two distinct sections:
 - **Video Player (Cloudflare Stream):**
   - Adaptive bitrate, captions (AI-generated + editable).
   - Speed control, picture-in-picture, offline download (mobile app later).
-  - Progress tracking, resume.
+  - Progress tracking, resume. A view counts after 30 seconds of real playback (the revenue pool's
+    threshold); the server credits no more watch time than has actually elapsed. A lesson completes
+    at 90% watched or within its last 30 seconds, or when the member marks it complete.
   - Watermark / logo overlay (standardized branding).
   - Clip creation / share (for social, with attribution).
 - **Ratings & Reviews:**
@@ -118,7 +120,7 @@ Two distinct sections:
   - Helpful votes on reviews.
 - **Progress & Learning:**
   - Course progress bars, completion badges.
-  - Personal “My Learning” dashboard.
+  - Personal “My Learning” dashboard (continue watching, courses in progress).
   - Recommended next based on watched content and ratings.
 - **Community (Phase 1 lightweight):**
   - Comments under videos.
