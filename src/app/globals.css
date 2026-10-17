@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * Brand (development plan 5.4): deep navy, warm gold accents, clean whites,
+ * serif headings for authority, sans body for readability.
+ */
+@theme {
+  --color-navy-950: #070f1f;
+  --color-navy-900: #0c1a33;
+  --color-navy-800: #132546;
+  --color-navy-700: #1d3561;
+  --color-navy-100: #e3e8f2;
+  --color-gold-600: #a8741f;
+  --color-gold-500: #c48b2c;
+  --color-gold-400: #d9a446;
+  --color-gold-100: #f8edd8;
+  --color-paper: #fbfaf7;
+  --color-ink: #121826;
+  --color-muted: #5b6475;
+
+  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-serif tracking-tight text-navy-900;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold-500;
+  }
+}
