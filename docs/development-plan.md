@@ -126,6 +126,10 @@ Two distinct sections:
   - Full-text search across titles, descriptions, transcripts.
   - Categories: Expectant, New Dads, School-age, Teens, Co-parenting, Presence, Discipline, Work-Family, Research, Personal Stories, etc.
   - Curated playlists (e.g., “Start Here,” “Book Companion”).
+  - **Themes** (added October 17, 2026): topical collections such as “Choosing a Partner,”
+    seeded from the book. AI places every video and course in up to three themes and
+    proposes new themes for admin approval when nothing fits. See the README.
+
 
 ### 3.3 Creator System (“Selected Fathers” / Fellows)
 - Application / invitation process for upload privileges.

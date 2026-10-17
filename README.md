@@ -28,12 +28,17 @@ npm run dev                  # http://localhost:3000
 | `npm run typecheck` / `lint` | TypeScript and ESLint |
 | `npm run db:generate` | Generate a migration after editing `src/lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
+| `npm run themes:seed` | Add the starting themes (never overwrites existing ones) |
+| `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
 
 Environment variables are validated per integration when first used
 (`src/lib/env.ts`), so the app builds and tests run without secrets.
 
 ## Services
+
+**Anthropic (AI themes).** Set `ANTHROPIC_API_KEY` to turn on the theme classifier.
+Without it the site works normally and content waits, unthemed, for an admin.
 
 **Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
 
@@ -92,6 +97,26 @@ everyone; approved Professional videos need an active membership (or a preview
 lesson) and always play through a short-lived signed token; unapproved videos are
 visible only to their creator and admins.
 
+## Themes
+
+Themes organize every video and course by topic (for example "Choosing a Partner"),
+on `/themes` for members and `/admin/themes` for admins.
+
+- **Starting themes** come from `src/lib/themes/seed.ts` (`npm run themes:seed`). The
+  current ten are provisional, drawn from the development plan's description of the
+  book, and should be replaced with themes from the book draft.
+- **AI placement** (`src/lib/themes/classifier.ts`, Claude with structured output): each
+  video is classified when it finishes processing, before review. It goes into up to 3
+  themes, each with a confidence and a one-line reason. Placements under 55% are dropped.
+- **AI themes**: when nothing fits at 75% or better, the AI may propose a new theme. Proposals
+  stay private until an admin approves, merges or archives them. The AI reuses pending
+  proposals rather than creating duplicates.
+- **Admin decisions win**: an admin can place content, remove it (the AI won't put it
+  back), edit theme names and descriptions (the AI reads the descriptions), merge themes
+  (the AI follows the merge) and archive them.
+
+Tuning lives in `src/lib/themes/policy.ts`.
+
 ## Creator revenue share
 
 Same model as Winning Careers (details in plan section 3.5, constants in
@@ -119,7 +144,7 @@ at upload time.
 
 Done: project scaffold, schema and migrations, auth, membership checkout and
 billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
-pages, creator revenue-share settlement.
+pages, creator revenue-share settlement, AI themes.
 
 Next (Phase 1): admin moderation queue and AI pre-screen, course catalog and player
 UI, creator upload UI and dashboard (including earnings), ratings and progress

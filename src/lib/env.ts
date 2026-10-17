@@ -52,3 +52,11 @@ export function streamEnv() {
     CLOUDFLARE_STREAM_WATERMARK_UID: z.string().optional(),
   });
 }
+
+/**
+ * Whether the AI theme classifier can run. The Anthropic SDK reads
+ * ANTHROPIC_API_KEY itself; without it, content is left unthemed for admins.
+ */
+export function themeClassifierConfigured(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
+}
