@@ -11,7 +11,7 @@ import type { Database } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import type { ContentForTheming, ThemeClassifier, ThemeForPrompt } from "./classifier";
 import type { ClassifierOutput } from "./resolve";
-import { SEED_THEMES } from "./seed";
+import { SEED_THEMES, SUPERSEDED_SEED_THEMES } from "./seed";
 import {
   adminThemeContent,
   assignThemes,
@@ -92,8 +92,50 @@ describe.skipIf(!url)("theme service (Postgres)", () => {
   it("seeds the starting themes once and never overwrites admin edits", async () => {
     expect(await db.$count(schema.themes)).toBe(SEED_THEMES.length);
     await updateTheme(db, await themeId("presence"), { name: "Being Present" });
-    expect(await seedThemes(db)).toEqual([]);
+    expect(await seedThemes(db)).toEqual({ added: [], upgraded: [] });
     expect((await db.query.themes.findFirst({ where: eq(schema.themes.slug, "presence") }))!.name).toBe("Being Present");
+  });
+
+  it("upgrades unedited themes from the earlier seed in place, keeping their placements", async () => {
+    await db.execute(sql`truncate themes cascade`);
+    const oldRows = await db
+      .insert(schema.themes)
+      .values(SUPERSEDED_SEED_THEMES.map((t) => ({ slug: t.slug, name: t.name, description: t.description, status: "active" as const, origin: "book" as const })))
+      .returning();
+    const oldId = (slug: string) => oldRows.find((r) => r.slug === slug)!.id;
+    // An admin edited one theme; seeding must leave it alone.
+    await updateTheme(db, oldId("presence"), { description: "Our own description of presence." });
+    await placeContent(db, oldId("father-absence-and-repair"), { kind: "video", id: VIDEO });
+
+    const result = await seedThemes(db);
+
+    expect(result.upgraded).toContain("breaking-the-cycle");
+    expect(result.upgraded).not.toContain("presence");
+    expect(result.added.sort()).toEqual(["grow-the-tree-you-have", "the-biology-of-fatherhood", "the-future-of-fatherhood"]);
+    expect(await db.$count(schema.themes)).toBe(SEED_THEMES.length);
+
+    const renamed = await db.query.themes.findFirst({ where: eq(schema.themes.id, oldId("father-absence-and-repair")) });
+    expect(renamed).toMatchObject({ slug: "breaking-the-cycle", name: "Breaking the Cycle" });
+    expect(renamed!.bookReference).toContain("Ch. 2");
+    expect(await placementsFor(VIDEO)).toEqual([expect.objectContaining({ slug: "breaking-the-cycle", source: "admin" })]);
+    expect((await db.query.themes.findFirst({ where: eq(schema.themes.id, oldId("presence")) }))!.description).toBe(
+      "Our own description of presence.",
+    );
+
+    // Running it again changes nothing.
+    expect(await seedThemes(db)).toEqual({ added: [], upgraded: [] });
+  });
+
+  it("does not rename onto a slug that is already taken", async () => {
+    await db.execute(sql`truncate themes cascade`);
+    const old = SUPERSEDED_SEED_THEMES.find((t) => t.slug === "co-parenting")!;
+    await db.insert(schema.themes).values([
+      { slug: old.slug, name: old.name, description: old.description, status: "active", origin: "book" },
+      { slug: "partnership-and-co-parenting", name: "Partnership", description: "Created by an admin earlier.", status: "active", origin: "admin" },
+    ]);
+    const result = await seedThemes(db);
+    expect(result.upgraded).not.toContain("partnership-and-co-parenting");
+    expect(await db.$count(schema.themes, eq(schema.themes.slug, "co-parenting"))).toBe(1);
   });
 
   it("places a video, sends only active and proposed themes, and records when it ran", async () => {
@@ -136,15 +178,15 @@ describe.skipIf(!url)("theme service (Postgres)", () => {
     const target = { kind: "video" as const, id: VIDEO };
     await assignThemes(db, target, new ScriptedClassifier([answer([["presence", 80], ["work-and-family", 70]])]));
     await removeContent(db, await themeId("presence"), target);
-    await placeContent(db, await themeId("co-parenting"), target, true);
+    await placeContent(db, await themeId("partnership-and-co-parenting"), target, true);
 
     // The AI tries again with presence (removed) and co-parenting (admin's) and a new fit.
-    await assignThemes(db, target, new ScriptedClassifier([answer([["presence", 95], ["co-parenting", 90], ["discipline-and-character", 60]])]));
+    await assignThemes(db, target, new ScriptedClassifier([answer([["presence", 95], ["partnership-and-co-parenting", 90], ["values-and-character", 60]])]));
 
     expect(await placementsFor(VIDEO)).toEqual([
-      { slug: "co-parenting", source: "admin", status: "active", confidence: null, isPrimary: true },
-      { slug: "discipline-and-character", source: "ai", status: "active", confidence: 60, isPrimary: false },
+      { slug: "partnership-and-co-parenting", source: "admin", status: "active", confidence: null, isPrimary: true },
       { slug: "presence", source: "admin", status: "rejected", confidence: 80, isPrimary: false },
+      { slug: "values-and-character", source: "ai", status: "active", confidence: 60, isPrimary: false },
     ]);
   });
 
@@ -158,9 +200,9 @@ describe.skipIf(!url)("theme service (Postgres)", () => {
 
   it("merges a theme: content moves, the source is archived, and the AI follows the merge", async () => {
     const target = { kind: "video" as const, id: VIDEO };
-    const absence = await themeId("father-absence-and-repair");
+    const absence = await themeId("breaking-the-cycle");
     const presence = await themeId("presence");
-    await assignThemes(db, target, new ScriptedClassifier([answer([["father-absence-and-repair", 85]])]));
+    await assignThemes(db, target, new ScriptedClassifier([answer([["breaking-the-cycle", 85]])]));
     await placeContent(db, presence, { kind: "video", id: VIDEO2 });
     await placeContent(db, absence, { kind: "video", id: VIDEO2 });
 
@@ -170,7 +212,7 @@ describe.skipIf(!url)("theme service (Postgres)", () => {
     expect(await placementsFor(VIDEO2)).toEqual([expect.objectContaining({ slug: "presence", source: "admin" })]);
 
     // A stale answer naming the merged theme lands in its successor.
-    await assignThemes(db, target, new ScriptedClassifier([answer([["father-absence-and-repair", 77]])]));
+    await assignThemes(db, target, new ScriptedClassifier([answer([["breaking-the-cycle", 77]])]));
     expect(await placementsFor(VIDEO)).toEqual([expect.objectContaining({ slug: "presence", confidence: 77 })]);
 
     await expect(mergeThemes(db, presence, presence)).rejects.toThrowError(ThemeServiceError);
@@ -220,7 +262,7 @@ describe.skipIf(!url)("theme service (Postgres)", () => {
   });
 
   it("restoring an archived theme clears its merge pointer", async () => {
-    const absence = await themeId("father-absence-and-repair");
+    const absence = await themeId("breaking-the-cycle");
     await mergeThemes(db, absence, await themeId("presence"));
     await updateTheme(db, absence, { status: "active" });
     expect(await db.query.themes.findFirst({ where: and(eq(schema.themes.id, absence)) })).toMatchObject({ status: "active", mergedIntoId: null });
