@@ -1,10 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { COMMUNITY_MAX_DURATION_SECONDS } from "@/lib/config";
 import { getDb } from "@/lib/db";
 import { videoReviews, videos } from "@/lib/db/schema";
 import { streamEnv } from "@/lib/env";
 import { verifyStreamWebhook, type StreamVideo } from "@/lib/stream";
+import { themeInBackground } from "@/lib/themes/runtime";
 
 /**
  * Cloudflare Stream "video ready / errored" webhook. Moves a video from
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
       });
     }
   });
+
+  // Theme it now so reviewers see suggested themes alongside the video.
+  if (toStatus === "pending_review") after(() => themeInBackground({ kind: "video", id: video.id }));
 
   return NextResponse.json({ received: true });
 }

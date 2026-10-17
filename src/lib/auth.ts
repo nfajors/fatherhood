@@ -68,3 +68,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     stripeCustomerId: u.stripeCustomerId ?? null,
   };
 }
+
+/** The signed-in admin, or null for anyone else. */
+export async function getAdminUser(): Promise<SessionUser | null> {
+  const sessionUser = await getSessionUser();
+  return sessionUser?.role === "admin" ? sessionUser : null;
+}

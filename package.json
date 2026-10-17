@@ -18,7 +18,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "revenue:settle": "tsx --env-file-if-exists=.env.local scripts/settle-revenue.ts"
+    "revenue:settle": "tsx --env-file-if-exists=.env.local scripts/settle-revenue.ts",
+    "themes:seed": "tsx --env-file-if-exists=.env.local scripts/themes-seed.ts",
+    "themes:assign": "tsx --env-file-if-exists=.env.local scripts/themes-assign.ts"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.1",
@@ -36,6 +38,7 @@
     "vitest": "3.2.7"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.135.0",
     "@radix-ui/react-slot": "1.2.3",
     "better-auth": "1.6.33",
     "class-variance-authority": "0.7.1",

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SITE } from "@/lib/config";
 
 const NAV = [
+  { href: "/themes", label: "Themes" },
   { href: "/academy", label: "Academy" },
   { href: "/community", label: "Community Voices" },
   { href: "/book", label: "The Book" },

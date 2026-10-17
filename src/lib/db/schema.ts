@@ -7,6 +7,7 @@
  */
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   index,
@@ -221,6 +222,8 @@ export const videos = pgTable(
     ratingCount: integer("rating_count").notNull().default(0),
     viewCount: integer("view_count").notNull().default(0),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    /** When the theme classifier last ran on this video. */
+    themedAt: timestamp("themed_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
@@ -269,6 +272,8 @@ export const courses = pgTable("courses", {
   published: boolean("published").notNull().default(false),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   sortOrder: integer("sort_order").notNull().default(0),
+  /** When the theme classifier last ran on this course. */
+  themedAt: timestamp("themed_at", { withTimezone: true }),
   ...timestamps,
 });
 
@@ -559,5 +564,68 @@ export const poolShares = pgTable(
   (t) => [
     uniqueIndex("pool_shares_calculation_creator_idx").on(t.calculationId, t.creatorId),
     index("pool_shares_creator_payout_idx").on(t.creatorId, t.payoutId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Themes (lib/themes): topical organization of videos and courses
+// ---------------------------------------------------------------------------
+
+/** proposed = suggested by the AI and awaiting admin review; only active themes are public. */
+export const themeStatus = pgEnum("theme_status", ["proposed", "active", "archived"]);
+export type ThemeStatus = (typeof themeStatus.enumValues)[number];
+
+export const themeOrigin = pgEnum("theme_origin", ["book", "ai", "admin"]);
+
+export const themes = pgTable(
+  "themes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    /** What belongs in the theme. The classifier reads this, so write it for both people and the model. */
+    description: text("description").notNull(),
+    status: themeStatus("status").notNull(),
+    origin: themeOrigin("origin").notNull(),
+    /** Chapter or passage of the book the theme comes from. */
+    bookReference: text("book_reference"),
+    /** Why the AI proposed it (AI themes only). */
+    proposalRationale: text("proposal_rationale"),
+    /** Set when an admin merges this theme into another. */
+    mergedIntoId: uuid("merged_into_id").references((): AnyPgColumn => themes.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index("themes_status_idx").on(t.status)],
+);
+
+export const themeAssignmentSource = pgEnum("theme_assignment_source", ["ai", "admin"]);
+/** rejected = an admin removed it; the classifier will not assign it again. */
+export const themeAssignmentStatus = pgEnum("theme_assignment_status", ["active", "rejected"]);
+
+/** Places one video or one course in a theme. */
+export const themeAssignments = pgTable(
+  "theme_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    themeId: uuid("theme_id")
+      .notNull()
+      .references(() => themes.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id").references(() => videos.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").references(() => courses.id, { onDelete: "cascade" }),
+    source: themeAssignmentSource("source").notNull(),
+    status: themeAssignmentStatus("status").notNull().default("active"),
+    /** Classifier confidence, 0-100; null for admin placements. */
+    confidence: smallint("confidence"),
+    rationale: text("rationale"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    check("theme_assignments_one_target", sql`num_nonnulls(${t.videoId}, ${t.courseId}) = 1`),
+    uniqueIndex("theme_assignments_theme_video_idx").on(t.themeId, t.videoId),
+    uniqueIndex("theme_assignments_theme_course_idx").on(t.themeId, t.courseId),
+    index("theme_assignments_video_id_idx").on(t.videoId),
+    index("theme_assignments_course_id_idx").on(t.courseId),
   ],
 );
