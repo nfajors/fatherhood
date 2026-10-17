@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.135.0",
+    "@cloudflare/stream-react": "1.9.3",
     "@radix-ui/react-slot": "1.2.3",
     "better-auth": "1.6.33",
     "class-variance-authority": "0.7.1",

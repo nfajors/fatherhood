@@ -5,6 +5,7 @@
  * removed, and none of that may reach the database.
  */
 import type { ThemeStatus } from "@/lib/db/schema";
+import { slugify } from "@/lib/slug";
 import { THEME_POLICY as P } from "./policy";
 
 /** What the classifier returns (see classifier.ts for the schema sent to the model). */
@@ -35,18 +36,7 @@ export type ThemeProposal = {
 
 export type Resolution = { placements: Placement[]; proposal: ThemeProposal | null };
 
-/** URL-safe slug: "Co-Parenting & Step-Families" -> "co-parenting-and-step-families". */
-export function slugify(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/-+$/g, "");
-}
+export { slugify };
 
 function clampConfidence(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;

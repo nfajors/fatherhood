@@ -87,12 +87,19 @@ src/
     api/stripe/webhook      sync subscriptions (idempotent)
     api/videos/upload-url   one-time Cloudflare upload URL (Fellows: Community; admins: anything)
     api/videos/[id]/playback  entitlement check, signed URL for paid content
+    api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
+    academy/                course catalog, course pages, lesson player
+    community/              Community Voices library and video pages
+    learning/               My Learning: continue watching, courses in progress
+    admin/courses/          course builder
     api/stream/webhook      encoding finished -> review queue (or failed / too long)
   lib/
     config.ts               prices, limits, categories
     entitlements.ts         who may watch / upload (pure, unit-tested)
     stream.ts               Cloudflare Stream client, token signing, webhook verification
     stripe.ts               Stripe client and subscription mapping
+    courses/                catalog queries and the course builder
+    playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
 drizzle/                    SQL migrations
 ```
@@ -105,6 +112,27 @@ or `rejected` / `changes_requested` / `failed`; approved videos can later be
 everyone; approved Professional videos need an active membership (or a preview
 lesson) and always play through a short-lived signed token; unapproved videos are
 visible only to their creator and admins.
+
+## Academy and player
+
+- **Catalog.** `/academy` lists published courses (filter by category) with lesson count,
+  length and, for signed-in viewers, progress. A course page shows the outline: free preview
+  lessons are marked, the rest are locked for visitors, and members get Start or Continue.
+- **Lesson page.** The Cloudflare Stream player (captions, speed, picture-in-picture) with the
+  outline beside it, previous/next, "Mark as complete" and "Up next". Visitors on a paid lesson
+  see the membership offer instead. Paid lessons always play through a signed token (4 hours).
+  A lesson is a free preview only while its course is published.
+- **Community Voices.** `/community` lists approved Community videos (free to everyone), by
+  theme; each video page has its themes, related videos and a report button.
+- **My Learning.** `/learning`: continue watching (with resume position) and courses in progress.
+- **Watch tracking** (`src/lib/playback/`). The player sends a heartbeat every 15 seconds while
+  playing, on pause and end, and by `sendBeacon` when the tab is hidden. The server credits at
+  most the real time elapsed since the last heartbeat (plus 5 seconds), so a tampered client
+  can't inflate views. A view counts once per session at 30 seconds, the same threshold the
+  revenue pool uses. A lesson completes at 90% or within the last 30 seconds, or by hand.
+- **Course builder.** `/admin/courses`: create a draft, add modules and lessons, attach approved
+  professional videos, mark previews, reorder, and publish. Publishing requires every lesson
+  to have an approved professional video, and classifies the course into themes.
 
 ## Themes
 
@@ -191,8 +219,9 @@ at upload time.
 
 Done: project scaffold, schema and migrations, auth, membership checkout and
 billing portal, Stripe sync, Stream uploads and playback, entitlements, marketing
-pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue.
+pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue,
+course catalog, course builder, video player with watch tracking and progress, Community
+Voices library, My Learning.
 
-Next (Phase 1): course catalog and player UI (including the report button), creator
-upload UI and dashboard (including earnings and review status), ratings and progress
-tracking, search.
+Next (Phase 1): creator upload UI and dashboard (including earnings, review status and
+resubmission), ratings, search, lesson resource downloads.

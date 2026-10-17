@@ -25,8 +25,11 @@ export const COMMUNITY_MAX_DURATION_SECONDS = 8 * 60;
 /** Upper bound for professional lessons (Stream requires a value; lessons run 8-20 min). */
 export const PROFESSIONAL_MAX_DURATION_SECONDS = 2 * 60 * 60;
 
-/** Lifetime of signed playback tokens for paid content. */
-export const SIGNED_PLAYBACK_TTL_SECONDS = 60 * 60;
+/**
+ * Lifetime of signed playback tokens for paid content. Stream checks the token
+ * as segments load, so it must outlast a paused-and-resumed lesson.
+ */
+export const SIGNED_PLAYBACK_TTL_SECONDS = 4 * 60 * 60;
 
 export const CATEGORIES = [
   "Expectant",
