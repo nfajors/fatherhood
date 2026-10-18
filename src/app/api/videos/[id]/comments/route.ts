@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth";
 import { commentErrorResponse } from "@/lib/comments/http";
 import { COMMENT_POLICY, postComment } from "@/lib/comments/service";
 import { getDb } from "@/lib/db";
+import { notifyReplyInBackground } from "@/lib/emails/runtime";
 
 const body = z.object({ body: z.string().max(COMMENT_POLICY.maxChars * 2), parentId: z.uuid().nullable().optional() });
 
@@ -16,6 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!z.uuid().safeParse(id).success || !parsed.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   try {
     const comment = await postComment(getDb(), sessionUser, { videoId: id, body: parsed.data.body, parentId: parsed.data.parentId });
+    if (comment.parentId) after(() => notifyReplyInBackground(comment.id));
     return NextResponse.json({ comment: { id: comment.id } }, { status: 201 });
   } catch (error) {
     return commentErrorResponse(error);

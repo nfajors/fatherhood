@@ -71,6 +71,13 @@
       "when": 1792289966262,
       "tag": "0009_quizzes_and_certificates",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792292632156,
+      "tag": "0010_email_sequences",
+      "breakpoints": true
     }
   ]
 }

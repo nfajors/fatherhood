@@ -12,6 +12,8 @@ export type EmailMessage = {
   replyTo?: string;
   /** Resend skips a send whose key it has already seen, so retries never duplicate an email. */
   idempotencyKey?: string;
+  /** Extra headers, e.g. List-Unsubscribe on email people can opt out of. */
+  headers?: Record<string, string>;
 };
 
 export interface Mailer {
@@ -32,7 +34,7 @@ export class ResendMailer implements Mailer {
 
   async send(message: EmailMessage): Promise<void> {
     const { error } = await this.client.emails.send(
-      { from: this.from, to: message.to, subject: message.subject, html: message.html, text: message.text, replyTo: message.replyTo },
+      { from: this.from, to: message.to, subject: message.subject, html: message.html, text: message.text, replyTo: message.replyTo, headers: message.headers },
       message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined,
     );
     if (error) throw new EmailError(`Email to ${message.to} failed: ${error.message}`);

@@ -21,7 +21,8 @@
     "revenue:settle": "tsx --env-file-if-exists=.env.local scripts/settle-revenue.ts",
     "themes:seed": "tsx --env-file-if-exists=.env.local scripts/themes-seed.ts",
     "themes:assign": "tsx --env-file-if-exists=.env.local scripts/themes-assign.ts",
-    "gifts:deliver": "tsx --env-file-if-exists=.env.local scripts/gifts-deliver.ts"
+    "gifts:deliver": "tsx --env-file-if-exists=.env.local scripts/gifts-deliver.ts",
+    "emails:run": "tsx --env-file-if-exists=.env.local scripts/emails-run.ts"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.1",
