@@ -241,10 +241,15 @@ const communityCardFields = {
   ratingCount: videos.ratingCount,
 };
 
-export type CommunitySort = "newest" | "top_rated" | "most_viewed";
+export type CommunitySort = "newest" | "trending" | "top_rated" | "most_viewed";
+
+/** Counted views (30s+) in the last two weeks. */
+const recentViews = sql`(select count(*) from watch_sessions s where s.video_id = "videos"."id" and s.seconds_watched >= 30
+  and s.started_at >= now() - interval '14 days')`;
 
 const COMMUNITY_ORDER: Record<CommunitySort, SQL[]> = {
   newest: [sql`${videos.publishedAt} desc nulls last`, desc(videos.createdAt)],
+  trending: [sql`${recentViews} desc`, desc(videos.viewCount), sql`${videos.publishedAt} desc nulls last`],
   top_rated: [...topRatedOrder(videos.ratingAverage, videos.ratingCount), sql`${videos.publishedAt} desc nulls last`],
   most_viewed: [desc(videos.viewCount), sql`${videos.publishedAt} desc nulls last`],
 };
@@ -272,6 +277,16 @@ export async function listCommunityVideos(
     db.select({ n: sql<number>`count(*)::int` }).from(videos).where(where),
   ]);
   return { videos: rows, total: count?.n ?? 0 };
+}
+
+/** Published Community videos by id, as cards (missing or unpublished ids are left out). */
+export async function communityCardsByIds(db: Database, ids: string[]): Promise<CommunityCard[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select(communityCardFields)
+    .from(videos)
+    .innerJoin(user, eq(videos.creatorId, user.id))
+    .where(and(isPublishedCommunity, inArray(videos.id, ids)));
 }
 
 /** Active themes that have at least one published Community video, for the filter. */

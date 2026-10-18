@@ -90,6 +90,7 @@ src/
     api/videos/[id]/rating  rate a video, with an optional review
     api/reviews/[id]/helpful  mark a review helpful
     api/resources/[id]/download  access check, then a short-lived R2 link
+    api/videos/[id]/comments, api/comments/...  conversation: post, reply, edit, delete, report
     api/videos/[id]/playback  entitlement check, signed URL for paid content
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
     academy/                course catalog, course pages, lesson player
@@ -101,6 +102,9 @@ src/
     fellows/                about Fellows, and the application form
     search/                 site search
     admin/reviews/          review moderation
+    admin/comments/         comment moderation
+    admin/collections/      curated collections
+    collections/            collections ("Start Here", "Book Companion")
     api/stream/webhook      encoding finished -> review queue (or failed / too long)
   lib/
     config.ts               prices, limits, categories
@@ -112,6 +116,9 @@ src/
     ratings/                ratings, reviews, helpful votes, review moderation
     search/                 full-text search
     storage/r2.ts           Cloudflare R2: presigned uploads and downloads
+    comments/               comments, reports, moderation
+    collections/            curated collections
+    discovery/recommend.ts  "Recommended for you"
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
 drizzle/                    SQL migrations
@@ -194,6 +201,34 @@ Workbooks, PDFs and insight cards attached to lessons, stored in a private Cloud
   ```json
   [{ "AllowedOrigins": ["https://fatherhood.school"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
   ```
+
+## Conversation (comments)
+
+Under every Community video and lesson (`src/lib/comments/`).
+
+- **Who.** Signed-in viewers who can watch the video, so members only on paid lessons (visitors on a
+  paywalled lesson don't see that conversation). One level of replies; a reply to a reply joins the
+  thread. Comments show first name and last initial, with "Creator" and "Fatherhood.School" badges.
+- **Own comments.** Edit (marked "edited") and delete; a deleted comment with replies stays as a
+  placeholder so the thread still reads.
+- **Spam brake.** At most 5 comments per person per 10 minutes.
+- **Moderation.** Viewers report (one open report per person); at 3 reporters the comment hides
+  until an admin decides at `/admin/comments` (reported first): restore (dismisses the reports),
+  hide, or remove. Authors see their own hidden comment marked as under review.
+- **Not yet.** Email notifications for replies wait for notification preferences and unsubscribe.
+
+## Discovery
+
+- **Collections** (`/collections`, admin at `/admin/collections`): hand-picked, ordered paths of
+  courses and Community videos, each with an optional note, such as "Start Here" or "Book Companion".
+  Featured collections show as shelves at the top of the Academy and Community Voices. Visitors only
+  ever see published collections, and within them only published courses and approved videos.
+- **Recommended for you** (`src/lib/discovery/recommend.ts`), on My Learning and Community Voices:
+  each person's taste is a weight per theme from what they watched (30s+), finished and rated (4-5
+  stars pull toward a theme, 1-2 push away). Unwatched Community videos and unstarted courses are
+  scored by theme fit plus a little for good ratings, with the theme shown ("More on Presence").
+  Without history, or to fill the list, it shows what's popular (trending, then top rated).
+- **Trending** sort on Community Voices: counted views in the last 14 days.
 
 ## Ratings and reviews
 
@@ -317,6 +352,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Before launch: configure the production services (Stripe,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending. Before launch: configure the production services (Stripe,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

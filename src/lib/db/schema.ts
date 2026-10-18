@@ -508,6 +508,7 @@ export const watchSessions = pgTable(
   ],
 );
 
+export const reportStatus = pgEnum("report_status", ["open", "actioned", "dismissed"]);
 export const commentStatus = pgEnum("comment_status", ["visible", "hidden", "removed"]);
 
 export const comments = pgTable(
@@ -520,15 +521,45 @@ export const comments = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    parentId: uuid("parent_id"),
+    /** Replies point at a top-level comment (one level of threading). */
+    parentId: uuid("parent_id").references((): AnyPgColumn => comments.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
+    /** hidden: by moderators or the report threshold; removed: deleted by its author or an admin. */
     status: commentStatus("status").notNull().default("visible"),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("comments_video_id_idx").on(t.videoId), index("comments_parent_id_idx").on(t.parentId)],
+  (t) => [
+    index("comments_video_id_idx").on(t.videoId, t.createdAt),
+    index("comments_parent_id_idx").on(t.parentId),
+    index("comments_user_created_idx").on(t.userId, t.createdAt),
+  ],
 );
 
-export const reportStatus = pgEnum("report_status", ["open", "actioned", "dismissed"]);
+/** Viewer reports on comments; enough distinct reporters hide the comment until an admin decides. */
+export const commentReports = pgTable(
+  "comment_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    /** One of REPORT_REASONS (lib/moderation/policy.ts). */
+    reason: text("reason").notNull(),
+    status: reportStatus("status").notNull().default("open"),
+    resolvedById: text("resolved_by_id").references(() => user.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("comment_reports_status_idx").on(t.status),
+    uniqueIndex("comment_reports_open_per_reporter_idx")
+      .on(t.commentId, t.reporterId)
+      .where(sql`${t.status} = 'open'`),
+  ],
+);
+
 
 /** User reports on published content (plan section 3.4, post-publish). */
 export const contentReports = pgTable(
@@ -739,5 +770,43 @@ export const themeAssignments = pgTable(
     uniqueIndex("theme_assignments_theme_course_idx").on(t.themeId, t.courseId),
     index("theme_assignments_video_id_idx").on(t.videoId),
     index("theme_assignments_course_id_idx").on(t.courseId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Collections (lib/collections): admin-curated playlists such as "Start Here"
+// ---------------------------------------------------------------------------
+
+export const collections = pgTable("collections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  published: boolean("published").notNull().default(false),
+  /** Featured collections show at the top of the Academy and Community Voices. */
+  featured: boolean("featured").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+});
+
+export const collectionItems = pgTable(
+  "collection_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").references(() => courses.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id").references(() => videos.id, { onDelete: "cascade" }),
+    /** Why it's here, shown with the item ("Start with this one if your first child is on the way"). */
+    note: text("note"),
+    position: integer("position").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    check("collection_items_one_target", sql`num_nonnulls(${t.courseId}, ${t.videoId}) = 1`),
+    uniqueIndex("collection_items_course_idx").on(t.collectionId, t.courseId),
+    uniqueIndex("collection_items_video_idx").on(t.collectionId, t.videoId),
+    index("collection_items_position_idx").on(t.collectionId, t.position),
   ],
 );

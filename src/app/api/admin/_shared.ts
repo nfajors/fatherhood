@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAdminUser, type SessionUser } from "@/lib/auth";
 import { CourseError } from "@/lib/courses/admin";
+import { CollectionError } from "@/lib/collections/service";
+import { CommentError } from "@/lib/comments/service";
 import { ApplicationError } from "@/lib/creators/applications";
 import { ResourceError } from "@/lib/courses/resources";
 import { ModerationError } from "@/lib/moderation/service";
@@ -30,6 +32,9 @@ export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>
     }
     if (error instanceof ApplicationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" || error.reason === "no_account" ? 404 : 409 });
+    }
+    if (error instanceof CollectionError || error instanceof CommentError) {
+      return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 400 });
     }
     if (error instanceof ResourceError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 400 });

@@ -25,7 +25,7 @@ export function CourseCardView({ course }: { course: CourseCard }) {
     .filter(Boolean)
     .join(" · ");
   return (
-    <Link href={`/academy/${course.slug}`} className="group block h-full overflow-hidden rounded-xl border border-navy-900/10 bg-white shadow-sm hover:border-gold-500">
+    <Link href={`/academy/${course.slug}`} className="group relative block h-full overflow-hidden rounded-xl border border-navy-900/10 bg-white shadow-sm hover:border-gold-500">
       {course.coverImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- admin-provided cover URL
         <img src={course.coverImageUrl} alt="" className="aspect-[16/9] w-full object-cover" />
@@ -55,7 +55,7 @@ export function CourseCardView({ course }: { course: CourseCard }) {
 
 export function VideoCardView({ video }: { video: CommunityCard }) {
   return (
-    <Link href={`/community/${video.id}`} className="group block overflow-hidden rounded-xl border border-navy-900/10 bg-white shadow-sm hover:border-gold-500">
+    <Link href={`/community/${video.id}`} className="group relative block overflow-hidden rounded-xl border border-navy-900/10 bg-white shadow-sm hover:border-gold-500">
       <div className="relative">
         {video.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- Stream thumbnail

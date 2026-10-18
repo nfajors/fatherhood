@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { CommentsSection } from "@/components/comments/comments-section";
 import { RatingsSection } from "@/components/ratings/ratings-section";
 import { KIND_LABEL } from "@/lib/courses/resources";
 import { LessonPlayer } from "@/components/video/lesson-player";
@@ -18,7 +19,7 @@ import { resumeAt } from "@/lib/playback/progress";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ slug: string; lessonId: string }> };
-type Search = { searchParams: Promise<{ reviews?: string; all?: string }> };
+type Search = { searchParams: Promise<{ reviews?: string; all?: string; comments?: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, lessonId } = await params;
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 export default async function LessonPage({ params, searchParams }: Params & Search) {
-  const [{ slug, lessonId }, { reviews, all }] = await Promise.all([params, searchParams]);
+  const [{ slug, lessonId }, { reviews, all, comments }] = await Promise.all([params, searchParams]);
   if (!z.uuid().safeParse(lessonId).success) notFound();
   const db = getDb();
   const sessionUser = await getSessionUser().catch(() => null);
@@ -131,6 +132,7 @@ export default async function LessonPage({ params, searchParams }: Params & Sear
           {decision.allowed && <ReportButton videoId={video.id} signedIn={Boolean(sessionUser)} returnTo={returnTo} />}
         </div>
         <RatingsSection db={db} videoId={video.id} viewer={sessionUser} sort={reviews === "newest" ? "newest" : "helpful"} showAll={all === "1"} path={returnTo} />
+        {decision.allowed && <CommentsSection db={db} videoId={video.id} viewer={sessionUser} path={returnTo} showAll={comments === "all"} />}
       </div>
 
       <aside aria-label="Course outline" className="lg:sticky lg:top-6 lg:self-start">

@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VideoCardView } from "@/components/catalog/cards";
+import { CollectionShelf } from "@/components/collections/shelf";
+import { RecommendedSection } from "@/components/discovery/recommended";
+import { getSessionUser } from "@/lib/auth";
+import { publishedCollections } from "@/lib/collections/service";
 import { communityThemes, listCommunityVideos, type CommunitySort } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
+import { recommendFor } from "@/lib/discovery/recommend";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -15,6 +20,7 @@ const PAGE_SIZE = 24;
 
 const SORTS: { value: CommunitySort; label: string }[] = [
   { value: "newest", label: "Newest" },
+  { value: "trending", label: "Trending" },
   { value: "top_rated", label: "Top rated" },
   { value: "most_viewed", label: "Most viewed" },
 ];
@@ -24,9 +30,14 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   const sort = SORTS.find((s) => s.value === rawSort)?.value ?? "newest";
   const pageNumber = Math.max(1, Number.parseInt(page ?? "1", 10) || 1);
   const db = getDb();
-  const [{ videos, total }, themes] = await Promise.all([
+  const sessionUser = await getSessionUser().catch(() => null);
+  // Discovery rows only on the unfiltered first page.
+  const browsing = !theme && pageNumber === 1;
+  const [{ videos, total }, themes, featured, recs] = await Promise.all([
     listCommunityVideos(db, { themeSlug: theme, sort, limit: PAGE_SIZE, offset: (pageNumber - 1) * PAGE_SIZE }),
     communityThemes(db),
+    browsing ? publishedCollections(db, { featuredOnly: true, preview: 6, userId: sessionUser?.id ?? null }) : Promise.resolve([]),
+    browsing && sessionUser ? recommendFor(db, sessionUser.id, { videos: 3, courses: 0 }) : Promise.resolve(null),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const href = (p: number, s: CommunitySort = sort, t: string | undefined = theme) =>
@@ -41,6 +52,22 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
           Share yours
         </Link>
       </p>
+
+      {featured.length > 0 && (
+        <div className="mt-10 space-y-10">
+          {featured.map((f) => (
+            <CollectionShelf key={f.collection.id} collection={f.collection} entries={f.entries} total={f.total} />
+          ))}
+        </div>
+      )}
+      {recs?.personalized && (
+        <div className="mt-10">
+          <RecommendedSection recs={recs} />
+        </div>
+      )}
+      {(featured.length > 0 || recs?.personalized) && (
+        <h2 className="mt-14 text-2xl font-semibold">All stories</h2>
+      )}
 
       {themes.length > 0 && (
         <nav aria-label="Themes" className="mt-8 flex flex-wrap gap-2">
