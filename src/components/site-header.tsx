@@ -12,7 +12,7 @@ const NAV = [
 
 export function SiteHeader() {
   return (
-    <header className="border-b border-white/10 bg-navy-950 text-white">
+    <header className="border-b border-white/10 bg-navy-950 text-white print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Link href="/" className="font-serif text-xl font-semibold tracking-tight">
           Fatherhood<span className="text-gold-400">.School</span>

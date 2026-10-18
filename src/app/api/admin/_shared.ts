@@ -6,6 +6,8 @@ import { CollectionError } from "@/lib/collections/service";
 import { CommentError } from "@/lib/comments/service";
 import { ApplicationError } from "@/lib/creators/applications";
 import { ResourceError } from "@/lib/courses/resources";
+import { QuizDraftError } from "@/lib/learning/quiz-drafter";
+import { QuizError } from "@/lib/learning/quizzes";
 import { ModerationError } from "@/lib/moderation/service";
 import { RatingError } from "@/lib/ratings/service";
 import { ThemeServiceError } from "@/lib/themes/service";
@@ -18,6 +20,8 @@ const MODERATION_STATUS: Record<ModerationError["reason"], number> = {
   notes_required: 400,
   not_reportable: 400,
 };
+
+const QUIZ_STATUS: Record<QuizError["reason"], number> = { not_found: 404, invalid: 400, not_allowed: 409, not_publishable: 409 };
 
 /** Run an admin-only handler: 403 for everyone else; service errors become 4xx with their message. */
 export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>): Promise<Response> {
@@ -42,6 +46,10 @@ export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>
     if (error instanceof RatingError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 400 });
     }
+    if (error instanceof QuizError) {
+      return NextResponse.json({ error: error.reason, message: error.message }, { status: QUIZ_STATUS[error.reason] });
+    }
+    if (error instanceof QuizDraftError) return NextResponse.json({ error: "draft_failed", message: error.message }, { status: 502 });
     if (error instanceof ModerationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: MODERATION_STATUS[error.reason] });
     }

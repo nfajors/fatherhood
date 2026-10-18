@@ -9,6 +9,7 @@ import { continueWatching, coursesInProgress } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
 import { recommendFor } from "@/lib/discovery/recommend";
 import { formatDuration } from "@/lib/format";
+import { certificatesFor } from "@/lib/learning/certificates";
 
 export const metadata: Metadata = { title: "My Learning", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -17,10 +18,11 @@ export default async function LearningPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/sign-in?next=/learning");
   const db = getDb();
-  const [watching, courses, recs] = await Promise.all([
+  const [watching, courses, recs, certificates] = await Promise.all([
     continueWatching(db, sessionUser.id),
     coursesInProgress(db, sessionUser.id),
     recommendFor(db, sessionUser.id, { videos: 6, courses: 3 }),
+    certificatesFor(db, sessionUser.id),
   ]);
   const empty = watching.length === 0 && courses.length === 0;
 
@@ -84,6 +86,31 @@ export default async function LearningPage() {
             {courses.map((course) => (
               <li key={course.id}>
                 <CourseCardView course={course} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {certificates.length > 0 && (
+        <section className="mt-12" aria-labelledby="certificates">
+          <h2 id="certificates" className="text-2xl font-semibold">
+            Your certificates
+          </h2>
+          <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {certificates.map((c) => (
+              <li key={c.code}>
+                <Link href={`/certificates/${c.code}`} className="group flex items-start gap-3 rounded-xl border border-gold-500/40 bg-gold-100 p-4 hover:border-gold-500">
+                  <span aria-hidden className="text-2xl">
+                    🎓
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-navy-900 group-hover:underline">{c.courseTitle}</span>
+                    <span className="text-sm text-muted">
+                      Completed {c.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" })}
+                    </span>
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

@@ -93,10 +93,13 @@ src/
     api/videos/[id]/comments, api/comments/...  conversation: post, reply, edit, delete, report
     api/videos/[id]/playback  entitlement check, signed URL for paid content
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
+    api/quizzes/[id]/submit   grade a quiz attempt (and issue any certificate it earns)
+    api/admin/quizzes/...     quiz editor, AI drafts
     academy/                course catalog, course pages, lesson player
     community/              Community Voices library and video pages
     learning/               My Learning: continue watching, courses in progress
-    admin/courses/          course builder
+    admin/courses/          course builder (and each lesson's quiz)
+    certificates/[code]     shareable, printable certificate and its verification
     admin/creators/         Fellow applications and access
     studio/                 creator Studio: dashboard, upload, video pages, earnings
     fellows/                about Fellows, and the application form
@@ -118,6 +121,7 @@ src/
     storage/r2.ts           Cloudflare R2: presigned uploads and downloads
     comments/               comments, reports, moderation
     collections/            curated collections
+    learning/               quizzes, AI quiz drafts, certificates
     discovery/recommend.ts  "Recommended for you"
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
@@ -229,6 +233,30 @@ Under every Community video and lesson (`src/lib/comments/`).
   scored by theme fit plus a little for good ratings, with the theme shown ("More on Presence").
   Without history, or to fill the list, it shows what's popular (trending, then top rated).
 - **Trending** sort on Community Voices: counted views in the last 14 days.
+
+## Quizzes and certificates
+
+`src/lib/learning/`.
+
+- **Quizzes.** Any lesson can have one, edited from the course builder ("Add quiz"): up to 20
+  questions, each with one correct answer or "choose all that apply" (2-6 options), an optional
+  explanation, and a pass mark (70% by default). A quiz shows on the lesson page only once
+  published. Whoever may watch the lesson may take it, as often as they like; signed-out viewers
+  of a free preview are asked to sign in. Grading happens on the server, and correct answers
+  reach the browser only with the graded attempt, together with each explanation. A question
+  counts only when exactly the correct options are chosen.
+- **AI drafts.** "Draft questions with AI" asks Claude (`quiz-drafter.ts`) for about five
+  questions from the lesson's title, summary and transcript. Drafts go into an unpublished quiz
+  for an admin to read and edit before publishing, and never into a published one. Needs
+  `ANTHROPIC_API_KEY`; without it the button is hidden.
+- **Certificates.** Earned by finishing every available lesson of a published course and passing
+  every published quiz in it. Issued once, checked when a lesson is completed (in the
+  background), when a quiz is passed (the result says so straight away) and when the course page
+  opens. The course page shows progress toward it. Each has a code like `FS-7K3M-9QPX`; the public page
+  `/certificates/{code}` is the certificate and its verification, prints to one landscape page
+  ("Print / Save as PDF"), and offers its owner "Add to LinkedIn". The name and course title
+  are kept as issued. A revoked certificate's page says it's no longer valid. My Learning
+  lists a person's certificates.
 
 ## Ratings and reviews
 
@@ -352,6 +380,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending. Before launch: configure the production services (Stripe,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates. Before launch: configure the production services (Stripe,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

@@ -82,6 +82,9 @@ Two distinct sections:
   Stored privately in R2; downloadable by whoever may watch the lesson (members, or anyone on a
   free preview lesson) through links that expire in minutes.
 - Optional quizzes and certificates of completion.
+  Quizzes are per lesson (single or multiple answer, explanations, a pass mark), drafted by AI
+  for admin review if wanted. A certificate is earned by finishing every lesson and passing every
+  quiz in a course, and is verifiable at a public link that prints to PDF and adds to LinkedIn.
 - Examples: Author-led courses based on book chapters (Voices of Fatherhood, Why Fathers Matter, Lessons from Around the World, etc.), expert interviews, case studies.
 
 **B. Community Voices (Free to View)**

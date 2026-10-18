@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/config";
 import { ErrorText, useApiAction } from "@/components/use-api-action";
 
@@ -286,11 +287,16 @@ export function AddLessonForm({ moduleId, videos }: { moduleId: string; videos: 
 export function LessonRow({
   lesson,
   videos,
+  quiz,
+  courseId,
   first,
   last,
 }: {
   lesson: { id: string; title: string; summary: string | null; videoId: string | null; isPreview: boolean; videoTitle: string | null; videoStatus: string | null };
   videos: VideoOption[];
+  /** The lesson's quiz, if it has one. */
+  quiz: { questions: number; published: boolean } | null;
+  courseId: string;
   first: boolean;
   last: boolean;
 }) {
@@ -356,6 +362,11 @@ export function LessonRow({
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-1">
+        <Link href={`/admin/courses/${courseId}/lessons/${lesson.id}/quiz`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          {quiz && quiz.questions > 0
+            ? `Quiz: ${quiz.questions} question${quiz.questions === 1 ? "" : "s"}${quiz.published ? "" : " (draft)"}`
+            : "Add quiz"}
+        </Link>
         <Button size="sm" variant="ghost" disabled={pending || first} onClick={() => run(url, "PATCH", { move: "up" })} aria-label={`Move ${lesson.title} up`}>
           ↑
         </Button>

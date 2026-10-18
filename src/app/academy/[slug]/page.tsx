@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProgressBar } from "@/components/catalog/cards";
+import { CertificateBox } from "@/components/learning/certificate-box";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth";
 import { getCourseOutline } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
 import { formatDuration } from "@/lib/format";
+import { courseRequirements, issueIfEarned } from "@/lib/learning/certificates";
+import { courseQuizStatus } from "@/lib/learning/quizzes";
 import { isMember, loadViewer } from "@/lib/playback/access";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const { course, modules, stats, themes } = outline;
   const preview = outline.flat.find((l) => l.available && l.isPreview);
   const started = stats.completedCount > 0 || outline.flat.some((l) => l.positionSeconds > 0);
+  const userId = sessionUser?.id ?? null;
+  // Certificates are issued as lessons finish; checking here as well catches any missed in the background.
+  const [quizStatus, requirements, certificate] = await Promise.all([
+    courseQuizStatus(db, course.id, userId),
+    courseRequirements(db, userId ?? "", course.id),
+    userId ? issueIfEarned(db, userId, course.id).catch(() => null) : Promise.resolve(null),
+  ]);
 
   return (
     <div>
@@ -107,6 +117,11 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                             {lesson.completed && <span className="sr-only"> (completed)</span>}
                           </p>
                           {lesson.summary && <p className="mt-1 text-sm text-muted">{lesson.summary}</p>}
+                          {quizStatus.has(lesson.id) && (
+                            <p className={`mt-1 text-xs ${quizStatus.get(lesson.id)!.passed ? "text-green-800" : "text-muted"}`}>
+                              {quizStatus.get(lesson.id)!.passed ? "✓ Quiz passed" : "Includes a short quiz"}
+                            </p>
+                          )}
                           {lesson.resources.length > 0 && (
                             <p className="mt-1 text-xs text-muted">Includes: {lesson.resources.map((r) => r.title).join(", ")}</p>
                           )}
@@ -133,6 +148,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         </section>
 
         <aside className="space-y-6">
+          <CertificateBox certificateCode={certificate && !certificate.revokedAt ? certificate.code : null} requirements={requirements} signedIn={Boolean(userId)} />
           {course.description && (
             <div>
               <h2 className="text-lg font-semibold">About this course</h2>

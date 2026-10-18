@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { RatingsSection } from "@/components/ratings/ratings-section";
+import { LessonQuiz } from "@/components/learning/lesson-quiz";
 import { KIND_LABEL } from "@/lib/courses/resources";
 import { LessonPlayer } from "@/components/video/lesson-player";
 import { PlayerUnavailable } from "@/components/video/video-player";
@@ -13,6 +14,7 @@ import { getSessionUser } from "@/lib/auth";
 import { getCourseOutline, lessonNavigation } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
 import { formatBytes, formatDuration } from "@/lib/format";
+import { quizForLearner } from "@/lib/learning/quizzes";
 import { accessFor, loadViewer, playbackSource } from "@/lib/playback/access";
 import { resumeAt } from "@/lib/playback/progress";
 
@@ -44,6 +46,7 @@ export default async function LessonPage({ params, searchParams }: Params & Sear
   const decision = await accessFor(db, video, await loadViewer(db, sessionUser));
   const source = decision.allowed ? await playbackSource(video, decision) : null;
   const returnTo = `/academy/${slug}/${lessonId}`;
+  const quiz = decision.allowed ? await quizForLearner(db, lessonId, sessionUser?.id ?? null) : null;
 
   return (
     <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_320px]">
@@ -121,6 +124,7 @@ export default async function LessonPage({ params, searchParams }: Params & Sear
             </ul>
           </section>
         )}
+        {quiz && <LessonQuiz quiz={quiz} signInHref={sessionUser ? null : `/sign-in?next=${encodeURIComponent(returnTo)}`} />}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-navy-900/10 pt-6">
           {nav.previous ? (
             <Link href={`/academy/${slug}/${nav.previous.id}`} className="text-sm text-navy-900 underline underline-offset-4">
