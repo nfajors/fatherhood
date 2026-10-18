@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { VideoCardView } from "@/components/catalog/cards";
+import { CommentsSection } from "@/components/comments/comments-section";
 import { RatingsSection } from "@/components/ratings/ratings-section";
 import { RatingBadge } from "@/components/ratings/stars";
 import { PlayerUnavailable, VideoPlayer } from "@/components/video/video-player";
@@ -28,8 +29,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     : {};
 }
 
-export default async function CommunityVideoPage({ params, searchParams }: Params & { searchParams: Promise<{ reviews?: string; all?: string }> }) {
-  const [{ id }, { reviews, all }] = await Promise.all([params, searchParams]);
+export default async function CommunityVideoPage({ params, searchParams }: Params & { searchParams: Promise<{ reviews?: string; all?: string; comments?: string }> }) {
+  const [{ id }, { reviews, all, comments }] = await Promise.all([params, searchParams]);
   if (!z.uuid().safeParse(id).success) notFound();
   const db = getDb();
   const found = await getCommunityVideo(db, id);
@@ -89,6 +90,7 @@ export default async function CommunityVideoPage({ params, searchParams }: Param
       </div>
 
       <RatingsSection db={db} videoId={video.id} viewer={sessionUser} sort={reviews === "newest" ? "newest" : "helpful"} showAll={all === "1"} path={`/community/${video.id}`} />
+      <CommentsSection db={db} videoId={video.id} viewer={sessionUser} path={`/community/${video.id}`} showAll={comments === "all"} />
 
       {related.length > 0 && (
         <section className="mt-14" aria-labelledby="related">

@@ -10,6 +10,8 @@ const LINKS = [
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/creators", label: "Fellows" },
   { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/comments", label: "Comments" },
+  { href: "/admin/collections", label: "Collections" },
   { href: "/admin/themes", label: "Themes" },
 ];
 

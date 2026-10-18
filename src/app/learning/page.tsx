@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CourseCardView, ProgressBar } from "@/components/catalog/cards";
+import { RecommendedSection } from "@/components/discovery/recommended";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth";
 import { continueWatching, coursesInProgress } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
+import { recommendFor } from "@/lib/discovery/recommend";
 import { formatDuration } from "@/lib/format";
 
 export const metadata: Metadata = { title: "My Learning", robots: { index: false } };
@@ -15,7 +17,11 @@ export default async function LearningPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/sign-in?next=/learning");
   const db = getDb();
-  const [watching, courses] = await Promise.all([continueWatching(db, sessionUser.id), coursesInProgress(db, sessionUser.id)]);
+  const [watching, courses, recs] = await Promise.all([
+    continueWatching(db, sessionUser.id),
+    coursesInProgress(db, sessionUser.id),
+    recommendFor(db, sessionUser.id, { videos: 6, courses: 3 }),
+  ]);
   const empty = watching.length === 0 && courses.length === 0;
 
   return (
@@ -83,6 +89,10 @@ export default async function LearningPage() {
           </ul>
         </section>
       )}
+
+      <div className="mt-12">
+        <RecommendedSection recs={recs} />
+      </div>
     </div>
   );
 }

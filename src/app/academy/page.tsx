@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CourseCardView } from "@/components/catalog/cards";
+import { CollectionShelf } from "@/components/collections/shelf";
 import { getSessionUser } from "@/lib/auth";
+import { publishedCollections } from "@/lib/collections/service";
 import { CATEGORIES } from "@/lib/config";
 import { listPublishedCourses } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
@@ -16,7 +18,11 @@ export const dynamic = "force-dynamic";
 export default async function AcademyPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const { category } = await searchParams;
   const sessionUser = await getSessionUser().catch(() => null);
-  const all = await listPublishedCourses(getDb(), sessionUser?.id ?? null);
+  const db = getDb();
+  const [all, featured] = await Promise.all([
+    listPublishedCourses(db, sessionUser?.id ?? null),
+    category ? Promise.resolve([]) : publishedCollections(db, { featuredOnly: true, preview: 6, userId: sessionUser?.id ?? null }),
+  ]);
   const courses = category ? all.filter((c) => c.category === category) : all;
   const usedCategories = CATEGORIES.filter((c) => all.some((course) => course.category === c));
 
@@ -27,6 +33,15 @@ export default async function AcademyPage({ searchParams }: { searchParams: Prom
         Structured courses for every stage of fatherhood. Lessons run 8 to 20 minutes, with workbooks and reflection
         exercises. Free preview lessons are open to everyone.
       </p>
+
+      {featured.length > 0 && (
+        <div className="mt-10 space-y-10">
+          {featured.map((f) => (
+            <CollectionShelf key={f.collection.id} collection={f.collection} entries={f.entries} total={f.total} />
+          ))}
+          <h2 className="pt-4 text-2xl font-semibold">All courses</h2>
+        </div>
+      )}
 
       {usedCategories.length > 1 && (
         <nav aria-label="Categories" className="mt-8 flex flex-wrap gap-2">

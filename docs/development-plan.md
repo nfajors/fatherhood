@@ -126,16 +126,17 @@ Two distinct sections:
 - **Progress & Learning:**
   - Course progress bars, completion badges.
   - Personal “My Learning” dashboard (continue watching, courses in progress).
-  - Recommended next based on watched content and ratings.
+  - Recommended next based on watched content and ratings (theme-based taste profile; see README).
 - **Community (Phase 1 lightweight):**
-  - Comments under videos.
+  - Comments under videos (one level of replies; viewer reports hide at three; admin queue).
   - Optional discussion threads.
   - Full “Quad”-style social feed in Phase 2.
 - **Search & Discovery:**
   - Full-text search across titles, descriptions, transcripts (Postgres, with stemming,
     phrase and exclusion syntax, prefix fallback and highlighted snippets).
   - Categories: Expectant, New Dads, School-age, Teens, Co-parenting, Presence, Discipline, Work-Family, Research, Personal Stories, etc.
-  - Curated playlists (e.g., “Start Here,” “Book Companion”).
+  - Curated playlists (e.g., “Start Here,” “Book Companion”): built as Collections, featured on
+    the Academy and Community Voices.
   - **Themes** (added October 17, 2026): 13 topical collections drawn from the book, such as
     “Choosing a Partner,” “Presence” and “Grow the Tree You Have.” AI places every video and course in up to three themes and
     proposes new themes for admin approval when nothing fits. See the README.
