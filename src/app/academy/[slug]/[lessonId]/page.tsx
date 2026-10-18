@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { RatingsSection } from "@/components/ratings/ratings-section";
 import { LessonPlayer } from "@/components/video/lesson-player";
 import { PlayerUnavailable } from "@/components/video/video-player";
 import { ReportButton } from "@/components/video/report-button";
@@ -16,6 +17,7 @@ import { resumeAt } from "@/lib/playback/progress";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ slug: string; lessonId: string }> };
+type Search = { searchParams: Promise<{ reviews?: string; all?: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug, lessonId } = await params;
@@ -24,8 +26,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return lesson && outline ? { title: `${lesson.title} | ${outline.course.title}` } : {};
 }
 
-export default async function LessonPage({ params }: Params) {
-  const { slug, lessonId } = await params;
+export default async function LessonPage({ params, searchParams }: Params & Search) {
+  const [{ slug, lessonId }, { reviews, all }] = await Promise.all([params, searchParams]);
   if (!z.uuid().safeParse(lessonId).success) notFound();
   const db = getDb();
   const sessionUser = await getSessionUser().catch(() => null);
@@ -106,6 +108,7 @@ export default async function LessonPage({ params }: Params) {
           )}
           {decision.allowed && <ReportButton videoId={video.id} signedIn={Boolean(sessionUser)} returnTo={returnTo} />}
         </div>
+        <RatingsSection db={db} videoId={video.id} viewer={sessionUser} sort={reviews === "newest" ? "newest" : "helpful"} showAll={all === "1"} path={returnTo} />
       </div>
 
       <aside aria-label="Course outline" className="lg:sticky lg:top-6 lg:self-start">

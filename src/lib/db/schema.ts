@@ -10,6 +10,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  customType,
   index,
   integer,
   jsonb,
@@ -23,6 +24,22 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+/** Postgres full-text search document; maintained by the database as a generated column. */
+const tsvector = customType<{ data: string }>({
+  dataType: () => "tsvector",
+});
+
+/**
+ * A weighted search document. Weights rank matches: A (titles) above B
+ * (descriptions, tags) above C (transcripts, chapters). `fs_text_array`
+ * is an immutable array_to_string defined in migration 0006.
+ */
+const searchDocument = (parts: { weight: "A" | "B" | "C"; text: ReturnType<typeof sql> }[]) =>
+  sql.join(
+    parts.map((p) => sql`setweight(to_tsvector('english'::regconfig, coalesce(${p.text}, '')), ${sql.raw(`'${p.weight}'`)})`),
+    sql` || `,
+  );
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -265,9 +282,18 @@ export const videos = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     /** When the theme classifier last ran on this video. */
     themedAt: timestamp("themed_at", { withTimezone: true }),
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      searchDocument([
+        { weight: "A", text: sql`title` },
+        { weight: "B", text: sql`description` },
+        { weight: "B", text: sql`fs_text_array(tags)` },
+        { weight: "C", text: sql`transcript` },
+      ]),
+    ),
     ...timestamps,
   },
   (t) => [
+    index("videos_search_idx").using("gin", t.searchVector),
     index("videos_creator_id_idx").on(t.creatorId),
     index("videos_type_status_idx").on(t.type, t.status),
     index("videos_status_review_due_idx").on(t.status, t.reviewDueAt),
@@ -321,8 +347,16 @@ export const courses = pgTable("courses", {
   sortOrder: integer("sort_order").notNull().default(0),
   /** When the theme classifier last ran on this course. */
   themedAt: timestamp("themed_at", { withTimezone: true }),
+  searchVector: tsvector("search_vector").generatedAlwaysAs(
+    searchDocument([
+      { weight: "A", text: sql`title` },
+      { weight: "B", text: sql`subtitle` },
+      { weight: "B", text: sql`description` },
+      { weight: "C", text: sql`book_chapter` },
+    ]),
+  ),
   ...timestamps,
-});
+}, (t) => [index("courses_search_idx").using("gin", t.searchVector)]);
 
 export const courseModules = pgTable(
   "course_modules",
@@ -351,11 +385,18 @@ export const lessons = pgTable(
     position: integer("position").notNull(),
     /** Free preview lessons are watchable without a membership. */
     isPreview: boolean("is_preview").notNull().default(false),
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      searchDocument([
+        { weight: "A", text: sql`title` },
+        { weight: "B", text: sql`summary` },
+      ]),
+    ),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("lessons_module_position_idx").on(t.moduleId, t.position),
     index("lessons_video_id_idx").on(t.videoId),
+    index("lessons_search_idx").using("gin", t.searchVector),
   ],
 );
 
@@ -394,10 +435,14 @@ export const ratings = pgTable(
     stars: smallint("stars").notNull(),
     review: text("review"),
     helpfulCount: integer("helpful_count").notNull().default(0),
+    /** Set when a moderator hides the written review; the stars still count. */
+    reviewHiddenAt: timestamp("review_hidden_at", { withTimezone: true }),
+    reviewHiddenById: text("review_hidden_by_id").references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("ratings_video_user_idx").on(t.videoId, t.userId),
+    index("ratings_video_created_idx").on(t.videoId, t.createdAt),
     check("ratings_stars_range", sql`${t.stars} between 1 and 5`),
   ],
 );

@@ -118,6 +118,9 @@ Two distinct sections:
   - Aggregate scores visible on cards and detail pages.
   - Sort/filter by rating, newest, most viewed.
   - Helpful votes on reviews.
+  - Rating requires watching at least 30 seconds; creators can't rate their own videos. "Top
+    rated" uses a Bayesian average so a single rating can't top the list. Admins can hide a
+    review's text; its stars still count.
 - **Progress & Learning:**
   - Course progress bars, completion badges.
   - Personal “My Learning” dashboard (continue watching, courses in progress).
@@ -127,7 +130,8 @@ Two distinct sections:
   - Optional discussion threads.
   - Full “Quad”-style social feed in Phase 2.
 - **Search & Discovery:**
-  - Full-text search across titles, descriptions, transcripts.
+  - Full-text search across titles, descriptions, transcripts (Postgres, with stemming,
+    phrase and exclusion syntax, prefix fallback and highlighted snippets).
   - Categories: Expectant, New Dads, School-age, Teens, Co-parenting, Presence, Discipline, Work-Family, Research, Personal Stories, etc.
   - Curated playlists (e.g., “Start Here,” “Book Companion”).
   - **Themes** (added October 17, 2026): 13 topical collections drawn from the book, such as

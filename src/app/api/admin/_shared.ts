@@ -4,6 +4,7 @@ import { getAdminUser, type SessionUser } from "@/lib/auth";
 import { CourseError } from "@/lib/courses/admin";
 import { ApplicationError } from "@/lib/creators/applications";
 import { ModerationError } from "@/lib/moderation/service";
+import { RatingError } from "@/lib/ratings/service";
 import { ThemeServiceError } from "@/lib/themes/service";
 
 export const targetSchema = z.object({ kind: z.enum(["video", "course"]), id: z.uuid() });
@@ -28,6 +29,9 @@ export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>
     }
     if (error instanceof ApplicationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" || error.reason === "no_account" ? 404 : 409 });
+    }
+    if (error instanceof RatingError) {
+      return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 400 });
     }
     if (error instanceof ModerationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: MODERATION_STATUS[error.reason] });

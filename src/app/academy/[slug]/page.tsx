@@ -38,7 +38,14 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
           <h1 className="mt-2 max-w-3xl text-4xl font-semibold text-white sm:text-5xl">{course.title}</h1>
           {course.subtitle && <p className="mt-4 max-w-2xl text-lg text-white/75">{course.subtitle}</p>}
           <p className="mt-4 text-sm text-white/70">
-            {[course.instructorName, `${stats.lessonCount} lessons`, formatDuration(stats.totalSeconds)].filter(Boolean).join(" · ")}
+            {[
+              course.instructorName,
+              `${stats.lessonCount} lessons`,
+              formatDuration(stats.totalSeconds),
+              stats.ratingAverage !== null ? `★ ${stats.ratingAverage.toFixed(1)} (${stats.ratingCount} ${stats.ratingCount === 1 ? "rating" : "ratings"})` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
           {course.bookChapter && (
             <p className="mt-2 text-sm text-gold-400">

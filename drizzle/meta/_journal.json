@@ -43,6 +43,13 @@
       "when": 1792276507423,
       "tag": "0005_creator_studio",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792283780446,
+      "tag": "0006_ratings_and_search",
+      "breakpoints": true
     }
   ]
 }
