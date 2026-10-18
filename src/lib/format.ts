@@ -31,3 +31,10 @@ export function formatWatchTime(seconds: number): string {
 export function formatCount(value: number): string {
   return value < 1000 ? String(value) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
+
+/** "2 KB", "5.3 MB", "640 MB", "1.5 GB". */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024 ** 2) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(bytes < 10 * 1024 ** 2 ? 1 : 0)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+}

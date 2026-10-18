@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload } from "tus-js-client";
 import { Button } from "@/components/ui/button";
 import type { VideoType } from "@/lib/db/schema";
-import { fileProblem, formatBytes, uploadErrorMessage } from "./upload-checks";
+import { formatBytes } from "@/lib/format";
+import { fileProblem, uploadErrorMessage } from "./upload-checks";
 
 /** Cloudflare wants tus chunks of at least 5 MB in multiples of 256 KB; 50 MB is its recommendation. */
 const CHUNK_SIZE = 50 * 1024 * 1024;

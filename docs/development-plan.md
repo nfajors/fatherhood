@@ -79,6 +79,8 @@ Two distinct sections:
 - High production value (studio or polished remote).
 - Typical lesson length: 8–20 minutes (courses 2–8 hours total).
 - Supporting materials: PDFs, workbooks, reflection exercises, key insight cards (drawn from book).
+  Stored privately in R2; downloadable by whoever may watch the lesson (members, or anyone on a
+  free preview lesson) through links that expire in minutes.
 - Optional quizzes and certificates of completion.
 - Examples: Author-led courses based on book chapters (Voices of Fatherhood, Why Fathers Matter, Lessons from Around the World, etc.), expert interviews, case studies.
 

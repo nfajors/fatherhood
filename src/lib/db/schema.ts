@@ -412,10 +412,16 @@ export const lessonResources = pgTable(
       .references(() => lessons.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     kind: resourceKind("kind").notNull(),
-    r2Key: text("r2_key").notNull(),
+    r2Key: text("r2_key").notNull().unique(),
+    /** The name it downloads as. */
+    fileName: text("file_name").notNull().default("download"),
+    contentType: text("content_type").notNull().default("application/octet-stream"),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    /** Order within the lesson. */
+    position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (t) => [index("lesson_resources_lesson_id_idx").on(t.lessonId)],
+  (t) => [index("lesson_resources_lesson_id_idx").on(t.lessonId, t.position)],
 );
 
 // ---------------------------------------------------------------------------

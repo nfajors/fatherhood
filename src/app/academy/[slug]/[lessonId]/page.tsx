@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { RatingsSection } from "@/components/ratings/ratings-section";
+import { KIND_LABEL } from "@/lib/courses/resources";
 import { LessonPlayer } from "@/components/video/lesson-player";
 import { PlayerUnavailable } from "@/components/video/video-player";
 import { ReportButton } from "@/components/video/report-button";
 import { getSessionUser } from "@/lib/auth";
 import { getCourseOutline, lessonNavigation } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
-import { formatDuration } from "@/lib/format";
+import { formatBytes, formatDuration } from "@/lib/format";
 import { accessFor, loadViewer, playbackSource } from "@/lib/playback/access";
 import { resumeAt } from "@/lib/playback/progress";
 
@@ -88,15 +89,36 @@ export default async function LessonPage({ params, searchParams }: Params & Sear
         <h1 className="mt-1 text-3xl font-semibold">{lesson.title}</h1>
         {lesson.summary && <p className="mt-3 text-lg text-ink">{lesson.summary}</p>}
         {lesson.resources.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold">Lesson materials</h2>
-            <ul className="mt-2 list-disc pl-5 text-ink">
-              {lesson.resources.map((r) => (
-                <li key={r.id}>{r.title}</li>
-              ))}
+          <section aria-labelledby="materials" className="mt-6">
+            <h2 id="materials" className="text-lg font-semibold">
+              Lesson materials
+            </h2>
+            <ul className="mt-3 divide-y divide-navy-900/10 rounded-xl border border-navy-900/10 bg-white">
+              {lesson.resources.map((r) => {
+                const meta = `${KIND_LABEL[r.kind as keyof typeof KIND_LABEL] ?? "Download"} · ${r.fileName.split(".").pop()?.toUpperCase()} · ${formatBytes(r.sizeBytes)}`;
+                return (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <span className="min-w-0">
+                      <span className="block font-medium">{r.title}</span>
+                      <span className="text-xs text-muted">{meta}</span>
+                    </span>
+                    {decision.allowed ? (
+                      <a
+                        href={`/api/resources/${r.id}/download`}
+                        className="inline-flex h-9 items-center gap-2 rounded-md border border-navy-900/20 px-3 text-sm font-semibold text-navy-900 hover:bg-navy-100"
+                      >
+                        <span aria-hidden>↓</span> Download<span className="sr-only"> {r.title}</span>
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted">
+                        <span aria-hidden>🔒 </span>For members
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
-            <p className="mt-1 text-sm text-muted">Downloads are coming soon.</p>
-          </div>
+          </section>
         )}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-navy-900/10 pt-6">
           {nav.previous ? (

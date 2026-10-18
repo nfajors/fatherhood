@@ -89,6 +89,7 @@ src/
     api/fellows/apply       apply for Fellow (upload) access
     api/videos/[id]/rating  rate a video, with an optional review
     api/reviews/[id]/helpful  mark a review helpful
+    api/resources/[id]/download  access check, then a short-lived R2 link
     api/videos/[id]/playback  entitlement check, signed URL for paid content
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
     academy/                course catalog, course pages, lesson player
@@ -110,6 +111,7 @@ src/
     creators/               Fellow applications, creator uploads, Studio dashboard and earnings
     ratings/                ratings, reviews, helpful votes, review moderation
     search/                 full-text search
+    storage/r2.ts           Cloudflare R2: presigned uploads and downloads
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
 drizzle/                    SQL migrations
@@ -170,6 +172,28 @@ visible only to their creator and admins.
   pool or anyone else's share.
 - **Own views don't count.** A creator watching their own video keeps their place but earns
   no views or pool share.
+
+## Lesson downloads
+
+Workbooks, PDFs and insight cards attached to lessons, stored in a private Cloudflare R2 bucket
+(`src/lib/courses/resources.ts`, `src/lib/storage/r2.ts`).
+
+- **Adding files.** In the course builder, each lesson has "+ Add download": title, kind
+  (workbook, PDF, insight card, other) and the file (PDF, Word, Excel, PowerPoint, PNG or JPEG,
+  up to 50 MB). The browser uploads it straight to R2 with a presigned URL bound to the file's
+  type; the server records it only after R2 confirms it arrived, taking the size from R2.
+  Files can be renamed, reordered and deleted (deleting removes the R2 object too).
+- **Downloading.** Whoever may watch the lesson may download its files: members, everyone on a
+  free preview lesson, and admins. Each download is an access check and then a redirect to an R2
+  link that expires in 5 minutes and saves the file under its original name. Visitors on a paid
+  lesson see "For members"; following a download link signs them in first.
+- **Setup.** Create a private R2 bucket and an R2 API token with Object Read & Write on it
+  (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`). Admins' browsers upload directly,
+  so add this CORS rule to the bucket (with your site's origin):
+
+  ```json
+  [{ "AllowedOrigins": ["https://fatherhood.school"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+  ```
 
 ## Ratings and reviews
 
@@ -291,6 +315,8 @@ billing portal, Stripe sync, Stream uploads and playback, entitlements, marketin
 pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue,
 course catalog, course builder, video player with watch tracking and progress, Community
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
-resubmission, dashboard, earnings), ratings and reviews, search.
+resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Next (Phase 1): lesson resource downloads.
+Phase 1 is feature-complete. Before launch: configure the production services (Stripe,
+Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
+in staging, and write the terms (including content licensing for uploads).
