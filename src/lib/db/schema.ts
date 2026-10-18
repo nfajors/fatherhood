@@ -810,3 +810,84 @@ export const collectionItems = pgTable(
     index("collection_items_position_idx").on(t.collectionId, t.position),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Quizzes and certificates (lib/learning)
+// ---------------------------------------------------------------------------
+
+export const questionKind = pgEnum("question_kind", ["single", "multiple"]);
+
+/** An optional end-of-lesson quiz. Members must pass every published quiz in a course to earn its certificate. */
+export const quizzes = pgTable("quizzes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lessonId: uuid("lesson_id")
+    .notNull()
+    .unique()
+    .references(() => lessons.id, { onDelete: "cascade" }),
+  passPercent: smallint("pass_percent").notNull().default(70),
+  published: boolean("published").notNull().default(false),
+  ...timestamps,
+});
+
+export type QuizOption = { id: string; text: string };
+
+export const quizQuestions = pgTable(
+  "quiz_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    prompt: text("prompt").notNull(),
+    kind: questionKind("kind").notNull().default("single"),
+    options: jsonb("options").$type<QuizOption[]>().notNull(),
+    /** Ids of the correct options; never sent to the browser before an answer is submitted. */
+    correctOptionIds: jsonb("correct_option_ids").$type<string[]>().notNull(),
+    /** Shown after answering: why the right answer is right. */
+    explanation: text("explanation"),
+    ...timestamps,
+  },
+  (t) => [index("quiz_questions_quiz_idx").on(t.quizId, t.position)],
+);
+
+export const quizAttempts = pgTable(
+  "quiz_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Question id -> chosen option ids. */
+    answers: jsonb("answers").$type<Record<string, string[]>>().notNull(),
+    scorePercent: smallint("score_percent").notNull(),
+    passed: boolean("passed").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("quiz_attempts_user_quiz_idx").on(t.userId, t.quizId)],
+);
+
+/** A course completion certificate, verifiable by its public code. */
+export const certificates = pgTable(
+  "certificates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** Short public code for /certificates/{code}. */
+    code: text("code").notNull().unique(),
+    /** Snapshots, so the certificate reads the same if names change later. */
+    recipientName: text("recipient_name").notNull(),
+    courseTitle: text("course_title").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("certificates_user_course_idx").on(t.userId, t.courseId)],
+);

@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { certifyInBackground } from "@/lib/learning/runtime";
 import { videos } from "@/lib/db/schema";
 import { accessFor, loadViewer } from "@/lib/playback/access";
 import { PlaybackError, recordHeartbeat, setCompleted } from "@/lib/playback/service";
@@ -40,6 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       watchedSeconds: parsed.data.watched,
       ended: parsed.data.ended,
     });
+    if (result.completed && sessionUser) after(() => certifyInBackground(sessionUser.id, id));
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof PlaybackError) return NextResponse.json({ error: error.reason }, { status: 409 });
@@ -61,5 +63,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const decision = await accessFor(db, video, await loadViewer(db, sessionUser));
   if (!decision.allowed) return NextResponse.json({ error: decision.reason }, { status: 403 });
   await setCompleted(db, sessionUser.id, id, parsed.data.completed);
+  if (parsed.data.completed) after(() => certifyInBackground(sessionUser.id, id));
   return NextResponse.json({ completed: parsed.data.completed });
 }

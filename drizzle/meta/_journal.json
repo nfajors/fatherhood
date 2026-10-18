@@ -64,6 +64,13 @@
       "when": 1792288680162,
       "tag": "0008_comments_and_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792289966262,
+      "tag": "0009_quizzes_and_certificates",
+      "breakpoints": true
     }
   ]
 }
