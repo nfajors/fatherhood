@@ -70,7 +70,7 @@ export type OutlineLesson = {
   available: boolean;
   completed: boolean;
   positionSeconds: number;
-  resources: { id: string; title: string; kind: string }[];
+  resources: { id: string; title: string; kind: string; fileName: string; sizeBytes: number }[];
 };
 
 export type CourseOutline = {
@@ -130,9 +130,17 @@ export async function getCourseOutline(
     progressFor(db, userId, lessonRows.flatMap((l) => (l.videoId ? [l.videoId] : []))),
     lessonIds.length
       ? db
-          .select({ id: lessonResources.id, lessonId: lessonResources.lessonId, title: lessonResources.title, kind: lessonResources.kind })
+          .select({
+            id: lessonResources.id,
+            lessonId: lessonResources.lessonId,
+            title: lessonResources.title,
+            kind: lessonResources.kind,
+            fileName: lessonResources.fileName,
+            sizeBytes: lessonResources.sizeBytes,
+          })
           .from(lessonResources)
           .where(inArray(lessonResources.lessonId, lessonIds))
+          .orderBy(asc(lessonResources.position), asc(lessonResources.createdAt))
       : Promise.resolve([]),
     db
       .select({ slug: themes.slug, name: themes.name })
@@ -161,7 +169,9 @@ export async function getCourseOutline(
       available: r.videoStatus === "approved",
       completed: p?.completed ?? false,
       positionSeconds: p?.positionSeconds ?? 0,
-      resources: resources.filter((res) => res.lessonId === r.id).map((res) => ({ id: res.id, title: res.title, kind: res.kind })),
+      resources: resources
+        .filter((res) => res.lessonId === r.id)
+        .map((res) => ({ id: res.id, title: res.title, kind: res.kind, fileName: res.fileName, sizeBytes: res.sizeBytes })),
     });
   }
 

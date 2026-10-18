@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatCount, formatDuration, formatMoney, formatWatchTime } from "./format";
+import { formatBytes, formatClock, formatCount, formatDuration, formatMoney, formatWatchTime } from "./format";
 
 describe("formatDuration", () => {
   it("rounds to minutes and switches to hours", () => {
@@ -29,5 +29,14 @@ describe("formatMoney, formatWatchTime, formatCount", () => {
     expect(formatCount(980)).toBe("980");
     expect(formatCount(1284)).toBe("1.3K");
     expect(formatCount(4_200_000)).toBe("4.2M");
+  });
+});
+
+describe("formatBytes", () => {
+  it("scales units", () => {
+    expect(formatBytes(2048)).toBe("2 KB");
+    expect(formatBytes(5.25 * 1024 ** 2)).toBe("5.3 MB");
+    expect(formatBytes(640 * 1024 ** 2)).toBe("640 MB");
+    expect(formatBytes(1.5 * 1024 ** 3)).toBe("1.5 GB");
   });
 });

@@ -28,10 +28,3 @@ export function uploadErrorMessage(error: unknown): string {
   }
   return "The upload stopped. Check your connection, then resume: it picks up where it left off.";
 }
-
-/** "12.4 MB of 640 MB". */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024 ** 2) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(bytes < 10 * 1024 ** 2 ? 1 : 0)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}

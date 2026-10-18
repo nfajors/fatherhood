@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/config";
 import type { VideoType } from "@/lib/db/schema";
 import { checkFile, UploadProgress, useResumableUpload } from "./resumable-upload";
-import { formatBytes } from "./upload-checks";
+import { formatBytes } from "@/lib/format";
 
 export const field = "mt-1 block w-full rounded-md border border-navy-900/20 bg-white px-3 py-2";
 

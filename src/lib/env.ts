@@ -53,6 +53,16 @@ export function streamEnv() {
   });
 }
 
+/** Cloudflare R2, for lesson downloads (PDFs, workbooks, insight cards). */
+export function r2Env() {
+  return parse("Cloudflare R2", {
+    CLOUDFLARE_ACCOUNT_ID: required,
+    R2_ACCESS_KEY_ID: required,
+    R2_SECRET_ACCESS_KEY: required,
+    R2_BUCKET: required,
+  });
+}
+
 /**
  * Whether the AI theme classifier can run. The Anthropic SDK reads
  * ANTHROPIC_API_KEY itself; without it, content is left unthemed for admins.

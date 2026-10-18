@@ -4,10 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AddLessonForm, AddModuleForm, CourseDetailsForm, LessonRow, ModuleControls, PublishToggle } from "@/components/admin/course-builder";
+import { LessonResources } from "@/components/admin/lesson-resources";
 import { Card } from "@/components/ui/card";
 import { instructorOptions, lessonVideoOptions } from "@/lib/courses/admin";
 import { getDb } from "@/lib/db";
-import { courseModules, courses, lessons, videos } from "@/lib/db/schema";
+import { courseModules, courses, lessonResources, lessons, videos } from "@/lib/db/schema";
 
 export const metadata: Metadata = { title: "Edit course (admin)", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -40,6 +41,20 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
     lessonVideoOptions(db),
     instructorOptions(db),
   ]);
+  const resources = await db
+    .select({
+      id: lessonResources.id,
+      lessonId: lessonResources.lessonId,
+      title: lessonResources.title,
+      kind: lessonResources.kind,
+      fileName: lessonResources.fileName,
+      sizeBytes: lessonResources.sizeBytes,
+    })
+    .from(lessonResources)
+    .innerJoin(lessons, eq(lessonResources.lessonId, lessons.id))
+    .innerJoin(courseModules, eq(lessons.moduleId, courseModules.id))
+    .where(eq(courseModules.courseId, id))
+    .orderBy(asc(lessonResources.position), asc(lessonResources.createdAt));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -90,6 +105,7 @@ export default async function AdminCoursePage({ params }: { params: Promise<{ id
                     {modLessons.map((lesson, li) => (
                       <li key={lesson.id}>
                         <LessonRow lesson={lesson} videos={videoOptions} first={li === 0} last={li === modLessons.length - 1} />
+                        <LessonResources lessonId={lesson.id} resources={resources.filter((r) => r.lessonId === lesson.id)} />
                       </li>
                     ))}
                   </ol>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileProblem, formatBytes, uploadErrorMessage } from "./upload-checks";
+import { fileProblem, uploadErrorMessage } from "./upload-checks";
 
 const mp4 = (size = 10_000_000) => ({ size, type: "video/mp4" });
 const response = (status: number, body: string) => ({ originalResponse: { getStatus: () => status, getBody: () => body } });
@@ -27,14 +27,5 @@ describe("uploadErrorMessage", () => {
     expect(uploadErrorMessage(response(409, JSON.stringify({ message: "This video's file can't be replaced now." })))).toBe("This video's file can't be replaced now.");
     expect(uploadErrorMessage(response(401, "{}"))).toMatch(/Sign in again/);
     expect(uploadErrorMessage(new Error("network"))).toMatch(/picks up where it left off/);
-  });
-});
-
-describe("formatBytes", () => {
-  it("scales units", () => {
-    expect(formatBytes(2048)).toBe("2 KB");
-    expect(formatBytes(5.25 * 1024 ** 2)).toBe("5.3 MB");
-    expect(formatBytes(640 * 1024 ** 2)).toBe("640 MB");
-    expect(formatBytes(1.5 * 1024 ** 3)).toBe("1.5 GB");
   });
 });
