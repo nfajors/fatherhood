@@ -3,11 +3,12 @@
  * courses and their outlines, lesson navigation, Community listings and the
  * viewer's own progress. Only approved videos are ever playable.
  */
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import { courseModules, courses, lessonResources, lessons, themeAssignments, themes, user, videos, watchProgress } from "@/lib/db/schema";
 import { percentComplete } from "@/lib/playback/progress";
 import { progressFor } from "@/lib/playback/service";
+import { topRatedOrder } from "@/lib/ratings/policy";
 
 export type CourseCard = {
   id: string;
@@ -20,6 +21,9 @@ export type CourseCard = {
   instructorName: string | null;
   lessonCount: number;
   totalSeconds: number;
+  /** Across the course's lesson videos; null until someone rates one. */
+  ratingAverage: number | null;
+  ratingCount: number;
   /** Null when signed out. */
   percentComplete: number | null;
 };
@@ -37,6 +41,9 @@ export async function listPublishedCourses(db: Database, userId: string | null):
       instructorName: user.name,
       lessonCount: sql<number>`count(${lessons.id}) filter (where ${videos.status} = 'approved')::int`,
       totalSeconds: sql<number>`coalesce(sum(${videos.durationSeconds}) filter (where ${videos.status} = 'approved'), 0)::int`,
+      ratingCount: sql<number>`coalesce(sum(${videos.ratingCount}) filter (where ${videos.status} = 'approved'), 0)::int`,
+      ratingAverage: sql<number | null>`round(sum(${videos.ratingAverage} * ${videos.ratingCount}) filter (where ${videos.status} = 'approved')
+        / nullif(sum(${videos.ratingCount}) filter (where ${videos.status} = 'approved'), 0), 2)`.mapWith((v) => (v === null ? null : Number(v))),
       completed: userId
         ? sql<number>`count(${watchProgress.videoId}) filter (where ${watchProgress.completed} and ${videos.status} = 'approved')::int`
         : sql<number>`0`,
@@ -72,7 +79,15 @@ export type CourseOutline = {
   /** All lessons in order, for navigation and "continue". */
   flat: OutlineLesson[];
   themes: { slug: string; name: string }[];
-  stats: { lessonCount: number; totalSeconds: number; completedCount: number; percentComplete: number };
+  stats: {
+    lessonCount: number;
+    totalSeconds: number;
+    completedCount: number;
+    percentComplete: number;
+    /** Across the lesson videos; null until someone rates one. */
+    ratingAverage: number | null;
+    ratingCount: number;
+  };
   /** Where "Start" / "Continue" should go: the first unfinished available lesson. */
   nextLessonId: string | null;
 };
@@ -101,6 +116,8 @@ export async function getCourseOutline(
       videoId: lessons.videoId,
       durationSeconds: videos.durationSeconds,
       videoStatus: videos.status,
+      ratingAverage: videos.ratingAverage,
+      ratingCount: videos.ratingCount,
     })
     .from(courseModules)
     .leftJoin(lessons, eq(lessons.moduleId, courseModules.id))
@@ -148,6 +165,9 @@ export async function getCourseOutline(
     });
   }
 
+  const rated = lessonRows.filter((r) => r.videoStatus === "approved" && r.ratingCount);
+  const ratingCount = rated.reduce((sum, r) => sum + r.ratingCount!, 0);
+  const ratingSum = rated.reduce((sum, r) => sum + Number(r.ratingAverage) * r.ratingCount!, 0);
   const flat = modules.flatMap((m) => m.lessons);
   const available = flat.filter((l) => l.available);
   const completedCount = available.filter((l) => l.completed).length;
@@ -161,6 +181,8 @@ export async function getCourseOutline(
       totalSeconds: available.reduce((sum, l) => sum + (l.durationSeconds ?? 0), 0),
       completedCount,
       percentComplete: percentComplete(completedCount, available.length),
+      ratingAverage: ratingCount ? Math.round((ratingSum / ratingCount) * 100) / 100 : null,
+      ratingCount,
     },
     nextLessonId: (available.find((l) => !l.completed) ?? available[0])?.id ?? null,
   };
@@ -193,6 +215,8 @@ export type CommunityCard = {
   durationSeconds: number | null;
   publishedAt: Date | null;
   viewCount: number;
+  ratingAverage: string | null;
+  ratingCount: number;
 };
 
 const communityCardFields = {
@@ -203,13 +227,23 @@ const communityCardFields = {
   durationSeconds: videos.durationSeconds,
   publishedAt: videos.publishedAt,
   viewCount: videos.viewCount,
+  ratingAverage: videos.ratingAverage,
+  ratingCount: videos.ratingCount,
+};
+
+export type CommunitySort = "newest" | "top_rated" | "most_viewed";
+
+const COMMUNITY_ORDER: Record<CommunitySort, SQL[]> = {
+  newest: [sql`${videos.publishedAt} desc nulls last`, desc(videos.createdAt)],
+  top_rated: [...topRatedOrder(videos.ratingAverage, videos.ratingCount), sql`${videos.publishedAt} desc nulls last`],
+  most_viewed: [desc(videos.viewCount), sql`${videos.publishedAt} desc nulls last`],
 };
 
 const isPublishedCommunity = and(eq(videos.type, "community"), eq(videos.status, "approved"));
 
 export async function listCommunityVideos(
   db: Database,
-  options: { themeSlug?: string; limit?: number; offset?: number } = {},
+  options: { themeSlug?: string; sort?: CommunitySort; limit?: number; offset?: number } = {},
 ): Promise<{ videos: CommunityCard[]; total: number }> {
   const themeFilter = options.themeSlug
     ? sql`exists (select 1 from theme_assignments a join themes t on t.id = a.theme_id
@@ -222,7 +256,7 @@ export async function listCommunityVideos(
       .from(videos)
       .innerJoin(user, eq(videos.creatorId, user.id))
       .where(where)
-      .orderBy(sql`${videos.publishedAt} desc nulls last`, desc(videos.createdAt))
+      .orderBy(...COMMUNITY_ORDER[options.sort ?? "newest"])
       .limit(options.limit ?? 24)
       .offset(options.offset ?? 0),
     db.select({ n: sql<number>`count(*)::int` }).from(videos).where(where),

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { VideoCardView } from "@/components/catalog/cards";
+import { RatingsSection } from "@/components/ratings/ratings-section";
+import { RatingBadge } from "@/components/ratings/stars";
 import { PlayerUnavailable, VideoPlayer } from "@/components/video/video-player";
 import { ReportButton } from "@/components/video/report-button";
 import { getSessionUser } from "@/lib/auth";
@@ -26,8 +28,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     : {};
 }
 
-export default async function CommunityVideoPage({ params }: Params) {
-  const { id } = await params;
+export default async function CommunityVideoPage({ params, searchParams }: Params & { searchParams: Promise<{ reviews?: string; all?: string }> }) {
+  const [{ id }, { reviews, all }] = await Promise.all([params, searchParams]);
   if (!z.uuid().safeParse(id).success) notFound();
   const db = getDb();
   const found = await getCommunityVideo(db, id);
@@ -62,8 +64,13 @@ export default async function CommunityVideoPage({ params }: Params) {
         )}
       </div>
       <h1 className="mt-6 text-3xl font-semibold">{video.title}</h1>
-      <p className="mt-1 text-muted">
-        {[creatorName, formatDuration(video.durationSeconds), video.viewCount ? `${video.viewCount.toLocaleString()} views` : null].filter(Boolean).join(" · ")}
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 text-muted">
+        <span>
+          {[creatorName, formatDuration(video.durationSeconds), video.viewCount ? `${video.viewCount.toLocaleString()} views` : null].filter(Boolean).join(" · ")}
+        </span>
+        <a href="#ratings">
+          <RatingBadge average={video.ratingAverage} count={video.ratingCount} />
+        </a>
       </p>
       {video.description && <p className="mt-4 whitespace-pre-line text-ink">{video.description}</p>}
       {themes.length > 0 && (
@@ -80,6 +87,8 @@ export default async function CommunityVideoPage({ params }: Params) {
       <div className="mt-6">
         <ReportButton videoId={video.id} signedIn={Boolean(sessionUser)} returnTo={`/community/${video.id}`} />
       </div>
+
+      <RatingsSection db={db} videoId={video.id} viewer={sessionUser} sort={reviews === "newest" ? "newest" : "helpful"} showAll={all === "1"} path={`/community/${video.id}`} />
 
       {related.length > 0 && (
         <section className="mt-14" aria-labelledby="related">

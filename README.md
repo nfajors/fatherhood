@@ -87,6 +87,8 @@ src/
     api/stripe/webhook      sync subscriptions (idempotent)
     api/studio/videos/...   creator uploads (resumable, straight to Cloudflare), edits, resubmission
     api/fellows/apply       apply for Fellow (upload) access
+    api/videos/[id]/rating  rate a video, with an optional review
+    api/reviews/[id]/helpful  mark a review helpful
     api/videos/[id]/playback  entitlement check, signed URL for paid content
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
     academy/                course catalog, course pages, lesson player
@@ -96,6 +98,8 @@ src/
     admin/creators/         Fellow applications and access
     studio/                 creator Studio: dashboard, upload, video pages, earnings
     fellows/                about Fellows, and the application form
+    search/                 site search
+    admin/reviews/          review moderation
     api/stream/webhook      encoding finished -> review queue (or failed / too long)
   lib/
     config.ts               prices, limits, categories
@@ -104,6 +108,8 @@ src/
     stripe.ts               Stripe client and subscription mapping
     courses/                catalog queries and the course builder
     creators/               Fellow applications, creator uploads, Studio dashboard and earnings
+    ratings/                ratings, reviews, helpful votes, review moderation
+    search/                 full-text search
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
 drizzle/                    SQL migrations
@@ -164,6 +170,38 @@ visible only to their creator and admins.
   pool or anyone else's share.
 - **Own views don't count.** A creator watching their own video keeps their place but earns
   no views or pool share.
+
+## Ratings and reviews
+
+- **Who can rate.** Signed-in viewers who have watched at least 30 seconds of a video (or
+  marked it complete), on Community videos and Academy lessons. Creators can't rate their own.
+  One rating per person per video, editable and removable; the written review is optional.
+- **Aggregates.** Each video's average and count are recomputed in the same transaction as
+  every change. Course ratings combine their lessons' ratings. Ratings show on cards, video
+  and lesson pages and course pages, with a 1-5 star breakdown.
+- **Reviews.** Listed by most helpful or newest, signed with first name and last initial.
+  Anyone signed in can mark a review helpful (not their own).
+- **Top rated** sorting (Community Voices and search) uses a Bayesian average (as if every
+  video started with five 4-star ratings), so one 5-star rating doesn't outrank many 4.8s;
+  rated videos come before unrated ones.
+- **Moderation.** `/admin/reviews` lists recent reviews; hiding one removes its text from the
+  site while its stars still count. Editing doesn't bring a hidden review back.
+
+## Search
+
+`/search` (the magnifier in the header) uses Postgres full-text search. Each video, course and
+lesson has a generated, GIN-indexed search document (migration 0006): titles weigh most, then
+descriptions, tags and lesson summaries, then transcripts and book chapters. English stemming
+means "apologizing" finds "apology".
+
+- Finds published courses (directly or through a matching lesson), lessons in published
+  courses (including by transcript), approved Community videos, and themes.
+- Supports "quoted phrases", *or*, and -exclusions. When a plain query finds nothing it retries
+  each word as a prefix, so partly typed words still find something.
+- Highlighted snippets show where the words matched. Tabs by type, a category filter, sorting
+  (best match, newest, top rated, most viewed) and paging.
+- Snippets can quote a few words of a members-only lesson's transcript; the lesson itself
+  stays behind the paywall.
 
 ## Themes
 
@@ -253,6 +291,6 @@ billing portal, Stripe sync, Stream uploads and playback, entitlements, marketin
 pages, creator revenue-share settlement, AI themes, gift memberships, moderation queue,
 course catalog, course builder, video player with watch tracking and progress, Community
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
-resubmission, dashboard, earnings).
+resubmission, dashboard, earnings), ratings and reviews, search.
 
-Next (Phase 1): ratings, search, lesson resource downloads.
+Next (Phase 1): lesson resource downloads.

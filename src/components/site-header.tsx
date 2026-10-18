@@ -25,7 +25,15 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <HeaderAccount />
+        <div className="flex items-center gap-1">
+          <Link href="/search" aria-label="Search" className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white">
+            <svg aria-hidden viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" className="size-5">
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="m13 13 4.5 4.5" strokeLinecap="round" />
+            </svg>
+          </Link>
+          <HeaderAccount />
+        </div>
       </div>
     </header>
   );

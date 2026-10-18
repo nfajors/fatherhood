@@ -180,7 +180,7 @@ describe.skipIf(!url)("courses and playback (Postgres)", () => {
         [true, false],
         [false, false],
       ]);
-      expect(outline.stats).toEqual({ lessonCount: 2, totalSeconds: 1200, completedCount: 1, percentComplete: 50 });
+      expect(outline.stats).toEqual({ lessonCount: 2, totalSeconds: 1200, completedCount: 1, percentComplete: 50, ratingAverage: null, ratingCount: 0 });
       expect(outline.nextLessonId).toBe(lessons[1]!.id);
 
       const nav = lessonNavigation(outline, lessons[1]!.id);

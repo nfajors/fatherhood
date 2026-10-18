@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CommunityCard, CourseCard } from "@/lib/courses/catalog";
+import { RatingBadge } from "@/components/ratings/stars";
 import { formatDuration } from "@/lib/format";
 
 export function ProgressBar({ percent, label }: { percent: number; label?: string }) {
@@ -40,6 +41,7 @@ export function CourseCardView({ course }: { course: CourseCard }) {
         <p className="mt-3 text-sm text-muted">
           {[course.instructorName, meta].filter(Boolean).join(" · ")}
         </p>
+        <RatingBadge average={course.ratingAverage} count={course.ratingCount} className="mt-2" />
         {course.percentComplete !== null && course.percentComplete > 0 && (
           <div className="mt-4">
             <ProgressBar percent={course.percentComplete} label={`${course.title} progress`} />
@@ -67,7 +69,10 @@ export function VideoCardView({ video }: { video: CommunityCard }) {
       </div>
       <div className="p-4">
         <p className="font-semibold text-navy-900 group-hover:underline">{video.title}</p>
-        <p className="mt-1 text-sm text-muted">{video.creatorName}</p>
+        <p className="mt-1 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+          <span>{video.creatorName}</span>
+          <RatingBadge average={video.ratingAverage} count={video.ratingCount} />
+        </p>
       </div>
     </Link>
   );
