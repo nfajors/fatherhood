@@ -633,10 +633,32 @@ export const creatorPayouts = pgTable(
     stripeTransferId: text("stripe_transfer_id").unique(),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Transfer attempts so far; a payout never attempted can still be recalculated. */
+    attempts: smallint("attempts").notNull().default(0),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    /** When the creator was last reminded to set up a payout account for this payout. */
+    setupReminderAt: timestamp("setup_reminder_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("creator_payouts_creator_id_idx").on(t.creatorId)],
+  (t) => [index("creator_payouts_creator_id_idx").on(t.creatorId), index("creator_payouts_status_idx").on(t.status)],
 );
+
+/** A creator's Stripe Connect (Express) account, mirrored from Stripe. */
+export const payoutAccounts = pgTable("payout_accounts", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "restrict" }),
+  stripeAccountId: text("stripe_account_id").notNull().unique(),
+  /** The creator finished Stripe's onboarding form. */
+  detailsSubmitted: boolean("details_submitted").notNull().default(false),
+  /** Stripe will pay out to their bank: transfers can be sent. */
+  payoutsEnabled: boolean("payouts_enabled").notNull().default(false),
+  /** What Stripe still needs (currently due and past due). */
+  requirementsDue: jsonb("requirements_due").$type<string[]>().notNull().default([]),
+  disabledReason: text("disabled_reason"),
+  country: text("country"),
+  ...timestamps,
+});
 
 // ---------------------------------------------------------------------------
 // Revenue share (policy in lib/revenue/policy.ts)

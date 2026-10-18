@@ -49,9 +49,15 @@ marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
 `BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
 **Scheduled jobs.** Set `CRON_SECRET`. On Vercel, `vercel.json` runs `/api/cron/gift-delivery`
-hourly, `/api/cron/moderation` every 10 minutes and `/api/cron/email-sequences` every 15 minutes
-(sub-daily crons need a paid Vercel plan). On other hosts, call them with
+hourly, `/api/cron/moderation` every 10 minutes, `/api/cron/email-sequences` every 15 minutes and
+`/api/cron/payouts` daily (sub-daily crons need a paid Vercel plan). On other hosts, call them with
 `Authorization: Bearer $CRON_SECRET` on the same schedule.
+
+**Stripe Connect (creator payouts).** Turn on Connect (Express accounts) in the Stripe dashboard,
+add a Connect webhook endpoint for `https://<host>/api/stripe/connect-webhook` listening to
+`account.updated` and `account.application.deauthorized`, and set its signing secret as
+`STRIPE_CONNECT_WEBHOOK_SECRET`. Set `PAYOUTS_AUTO_SEND=true` only once you're happy for ready
+payouts to go out daily without an admin pressing "Send".
 
 **Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
 
@@ -103,6 +109,9 @@ src/
     api/email/unsubscribe     one-click unsubscribe (signed link, no sign-in)
     api/email/preferences     change email settings
     api/cron/email-sequences  enroll and send sequence emails
+    api/cron/payouts          settle last month, payout reminders, automatic sending (if on)
+    api/studio/payouts/...    Stripe onboarding, return and dashboard links for creators
+    api/stripe/connect-webhook  sync creators' Stripe accounts
     academy/                course catalog, course pages, lesson player
     community/              Community Voices library and video pages
     learning/               My Learning: continue watching, courses in progress
@@ -110,6 +119,7 @@ src/
     certificates/[code]     shareable, printable certificate and its verification
     email/unsubscribe       email settings from an email's link (no sign-in)
     admin/emails/           sequence numbers and email previews
+    admin/payouts/          send payouts, Stripe balance, monthly settlements
     admin/creators/         Fellow applications and access
     studio/                 creator Studio: dashboard, upload, video pages, earnings
     fellows/                about Fellows, and the application form
@@ -133,6 +143,7 @@ src/
     collections/            curated collections
     learning/               quizzes, AI quiz drafts, certificates
     emails/                 email sequences, reply notifications, email settings
+    payouts/                Stripe Connect accounts and payout sending
     discovery/recommend.ts  "Recommended for you"
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
@@ -407,8 +418,34 @@ Same model as Winning Careers (details in plan section 3.5, constants in
   the pool is split in proportion to score.
 - Balances of $20+ become pending payouts; smaller balances carry forward.
 
-Run `npm run revenue:settle` monthly (e.g. on the 1st). Re-running a settled month
-returns the stored result; `--force` recalculates it unless it has already been paid out.
+Each month is settled automatically from the 5th of the next (the daily `/api/cron/payouts`
+job), or by an admin at `/admin/payouts`, or with `npm run revenue:settle`. Re-running a settled
+month returns the stored result; recalculating it (`--force`, or "Recalculate" in the admin)
+withdraws and recreates its payouts, and is refused once any of them has been sent or tried.
+
+## Creator payouts (Stripe Connect)
+
+`src/lib/payouts/`.
+
+- **Connecting.** Creators press "Set up payouts" on Studio > Earnings and finish Stripe's hosted
+  Express onboarding (identity, bank, tax details; we never see bank details). Accounts are
+  US-only and transfer-only. The page then shows what Stripe still needs, or "Payouts are on"
+  with a link into their Stripe Express dashboard (payout history, bank details, tax forms).
+  Account state is refreshed when they come back from Stripe and kept in sync by the Connect
+  webhook (`/api/stripe/connect-webhook`: `account.updated`, `account.application.deauthorized`).
+- **Sending.** A payout is a Stripe transfer from the platform balance to the creator's
+  account; Stripe then pays their bank on its own schedule. Admins send ready payouts from
+  `/admin/payouts` (all at once or one at a time, after confirming the total), which also shows
+  the available Stripe balance, payouts waiting on creators, failures and monthly settlements.
+  With `PAYOUTS_AUTO_SEND=true` the daily job sends them too.
+- **Never twice.** A payout is claimed before sending (with a 30-minute lease for crashed runs),
+  every transfer carries the payout's `transfer_group`, each attempt first checks Stripe for a
+  transfer already in that group, and each attempt has its own idempotency key.
+- **Failures** (for example, not enough available balance yet) are shown with the reason and
+  retried automatically every 6 hours, up to 5 attempts; after that an admin can put the payout
+  back in the queue or send it directly.
+- **Emails.** Creators get "You've been paid" when a transfer goes out, and a weekly reminder
+  (one email with their total) while money waits for them to set up payouts.
 
 ## Code reused from Winning
 
@@ -427,6 +464,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications. Before launch: configure the production services (Stripe,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, Stripe Connect payouts. Before launch: configure the production services (Stripe,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

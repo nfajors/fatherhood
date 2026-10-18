@@ -3,7 +3,7 @@
  *
  *   npm run revenue:settle              # previous calendar month
  *   npm run revenue:settle -- 2026-10   # a specific month
- *   npm run revenue:settle -- 2026-10 --force   # recalculate (refused once paid out)
+ *   npm run revenue:settle -- 2026-10 --force   # recalculate (refused once its payouts were sent or tried)
  */
 import { getDb } from "@/lib/db";
 import { monthPeriod } from "@/lib/revenue/pool";

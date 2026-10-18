@@ -183,6 +183,7 @@ export async function earningsHistory(db: Database, creatorId: string) {
         id: creatorPayouts.id,
         amountCents: creatorPayouts.amountCents,
         status: creatorPayouts.status,
+        attempts: creatorPayouts.attempts,
         periodEnd: creatorPayouts.periodEnd,
         paidAt: creatorPayouts.paidAt,
         createdAt: creatorPayouts.createdAt,
@@ -198,7 +199,7 @@ export async function earningsHistory(db: Database, creatorId: string) {
     balances: {
       /** Settled but not yet in a payout: carried forward until it reaches the minimum. */
       unpaidCents: sum(shares.filter((s) => !s.payoutId)),
-      inPayoutCents: sum(payouts.filter((p) => p.status === "pending" || p.status === "processing")),
+      inPayoutCents: sum(payouts.filter((p) => p.status !== "paid")),
       paidCents: sum(payouts.filter((p) => p.status === "paid")),
       minPayoutCents: P.minPayoutCents,
     },

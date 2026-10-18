@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/gift-delivery", "schedule": "0 * * * *" },
     { "path": "/api/cron/moderation", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/email-sequences", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/email-sequences", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/payouts", "schedule": "0 15 * * *" }
   ]
 }

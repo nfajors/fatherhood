@@ -31,7 +31,7 @@ describe.skipIf(!url)("settlePeriod (Postgres)", () => {
   });
 
   beforeEach(async () => {
-    await db.execute(sql`truncate pool_shares, pool_calculations, creator_payouts, revenue_ledger,
+    await db.execute(sql`truncate pool_shares, pool_calculations, creator_payouts, payout_accounts, revenue_ledger,
       watch_sessions, video_reviews, videos, "user" cascade`);
     await db.insert(schema.user).values(
       ["A", "B", "C", "D"].map((k) => ({ id: `cr_${k}`, name: `Creator ${k}`, email: `${k}@test.dev`, role: "creator" as const })),
@@ -93,7 +93,14 @@ describe.skipIf(!url)("settlePeriod (Postgres)", () => {
     const rerun = await settlePeriod(db, monthPeriod(2026, 9));
     expect(rerun).toMatchObject({ alreadySettled: true, calculationId: result.calculationId, payouts: [] });
 
+    // Untried payouts are withdrawn and recreated when the month is recalculated...
+    const recalculated = await settlePeriod(db, monthPeriod(2026, 9), { force: true });
+    expect(recalculated.payouts).toEqual(result.shares);
+    expect(await db.$count(schema.creatorPayouts)).toBe(3);
+    // ...but once any transfer has been tried, the month is final.
+    await db.update(schema.creatorPayouts).set({ attempts: 1, status: "failed" }).where(sql`${schema.creatorPayouts.creatorId} = 'cr_B'`);
     await expect(settlePeriod(db, monthPeriod(2026, 9), { force: true })).rejects.toThrowError(SettlementError);
+    expect(await db.$count(schema.creatorPayouts)).toBe(3);
   });
 
   it("carries balances under $20 forward until they reach it", async () => {

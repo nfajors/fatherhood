@@ -225,6 +225,9 @@ pool is always fully allocated.
 - Monthly settlement (`npm run revenue:settle -- YYYY-MM`) records each creator's share.
 - Balances of $20 or more become a payout; smaller balances carry forward until they reach $20.
 - Payouts are recorded as pending and sent manually at first; Stripe Connect automation is Phase 2.
+  *Built October 18, 2026:* creators connect Stripe Express accounts from Studio; payouts go out
+  as Stripe transfers when an admin sends them (or daily with automatic sending on), with
+  retries, setup reminders and paid emails.
 - Creator dashboard shows estimated and actual payouts, with the per-video view breakdown.
 - Professional course creators (including the author) participate in the same pool.
 

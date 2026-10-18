@@ -1,9 +1,9 @@
 /**
  * Monthly creator-pool settlement: loads the period's revenue and engagement,
  * applies the Winning pool policy (pool.ts) and records shares and payouts.
- * Payout records start as "pending"; sending money (Stripe Connect) is a later step.
+ * Payout records start as "pending"; lib/payouts sends them over Stripe Connect.
  */
-import { and, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import {
   creatorPayouts,
@@ -99,7 +99,7 @@ export async function estimatePeriod(db: Database, period: Period): Promise<{ in
 
 /**
  * Settle one period. Re-running a completed period returns the stored result
- * unless `force` is set; forcing is refused once any share has been paid out.
+ * unless `force` is set; forcing is refused once any of the period's payouts has been tried.
  */
 export async function settlePeriod(db: Database, period: Period, options: { force?: boolean } = {}): Promise<SettlementResult> {
   return db.transaction(async (tx) => {
@@ -124,12 +124,17 @@ export async function settlePeriod(db: Database, period: Period, options: { forc
     }
 
     if (existing) {
-      const paid = await tx
-        .select({ id: poolShares.id })
+      // Payouts from this period can be withdrawn only while no transfer has been tried.
+      const linked = await tx
+        .selectDistinct({ id: creatorPayouts.id, status: creatorPayouts.status, attempts: creatorPayouts.attempts })
         .from(poolShares)
-        .where(and(eq(poolShares.calculationId, existing.id), sql`${poolShares.payoutId} is not null`))
-        .limit(1);
-      if (paid.length > 0) throw new SettlementError("This period has shares included in payouts and cannot be recalculated.");
+        .innerJoin(creatorPayouts, eq(poolShares.payoutId, creatorPayouts.id))
+        .where(eq(poolShares.calculationId, existing.id));
+      if (linked.some((p) => p.status !== "pending" || p.attempts > 0)) {
+        throw new SettlementError("This period's payouts have already been sent (or tried), so it can't be recalculated.");
+      }
+      // Withdrawing a payout releases every share in it (earlier months too); they're paid out again below.
+      if (linked.length) await tx.delete(creatorPayouts).where(inArray(creatorPayouts.id, linked.map((p) => p.id)));
       await tx.delete(poolCalculations).where(eq(poolCalculations.id, existing.id));
     }
 

@@ -78,6 +78,13 @@
       "when": 1792292632156,
       "tag": "0010_email_sequences",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792298143409,
+      "tag": "0011_stripe_connect_payouts",
+      "breakpoints": true
     }
   ]
 }
