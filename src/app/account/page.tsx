@@ -2,12 +2,15 @@ import { desc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { EmailSettingsForm } from "@/components/email/email-settings";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { subscriptions } from "@/lib/db/schema";
+import { CATEGORY_LABELS } from "@/lib/emails/policy";
+import { getPreferences } from "@/lib/emails/preferences";
 import { hasActiveMembership } from "@/lib/entitlements";
 
 export const metadata: Metadata = { title: "Your account" };
@@ -17,7 +20,9 @@ export default async function AccountPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/sign-in?next=/account");
 
-  const rows = await getDb()
+  const db = getDb();
+  const prefs = await getPreferences(db, sessionUser.id);
+  const rows = await db
     .select()
     .from(subscriptions)
     .where(eq(subscriptions.userId, sessionUser.id))
@@ -46,6 +51,11 @@ export default async function AccountPage() {
           )}
           {sessionUser.stripeCustomerId ? <ManageBillingButton /> : null}
         </div>
+      </Card>
+      <Card className="mt-6" id="email">
+        <CardTitle>Email</CardTitle>
+        <CardDescription className="mb-5">Sent to {sessionUser.email}.</CardDescription>
+        <EmailSettingsForm initial={prefs} labels={CATEGORY_LABELS} />
       </Card>
     </div>
   );

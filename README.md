@@ -31,6 +31,7 @@ npm run dev                  # http://localhost:3000
 | `npm run themes:seed` | Add or update the starting themes from the book (never overwrites admin edits) |
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run gifts:deliver` | Send scheduled gift emails that are due, and retry failed sends |
+| `npm run emails:run` | Enroll people in email sequences and send what's due (what the cron does) |
 | `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
 
 Environment variables are validated per integration when first used
@@ -42,11 +43,15 @@ Environment variables are validated per integration when first used
 Without it the site works normally and content waits, unthemed, for an admin.
 
 **Email (Resend).** Set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in
-Resend). Without a key, emails are printed to the server log instead of sent.
+Resend). Without a key, emails are printed to the server log instead of sent. Before sending
+sequence emails for real, set `EMAIL_POSTAL_ADDRESS` (US law requires a postal address in
+marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
+`BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
 **Scheduled jobs.** Set `CRON_SECRET`. On Vercel, `vercel.json` runs `/api/cron/gift-delivery`
-hourly and `/api/cron/moderation` every 10 minutes (sub-daily crons need a paid Vercel plan). On
-other hosts, call both with `Authorization: Bearer $CRON_SECRET` on the same schedule.
+hourly, `/api/cron/moderation` every 10 minutes and `/api/cron/email-sequences` every 15 minutes
+(sub-daily crons need a paid Vercel plan). On other hosts, call them with
+`Authorization: Bearer $CRON_SECRET` on the same schedule.
 
 **Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
 
@@ -95,11 +100,16 @@ src/
     api/videos/[id]/progress  player heartbeats (views, resume) and "mark complete"
     api/quizzes/[id]/submit   grade a quiz attempt (and issue any certificate it earns)
     api/admin/quizzes/...     quiz editor, AI drafts
+    api/email/unsubscribe     one-click unsubscribe (signed link, no sign-in)
+    api/email/preferences     change email settings
+    api/cron/email-sequences  enroll and send sequence emails
     academy/                course catalog, course pages, lesson player
     community/              Community Voices library and video pages
     learning/               My Learning: continue watching, courses in progress
     admin/courses/          course builder (and each lesson's quiz)
     certificates/[code]     shareable, printable certificate and its verification
+    email/unsubscribe       email settings from an email's link (no sign-in)
+    admin/emails/           sequence numbers and email previews
     admin/creators/         Fellow applications and access
     studio/                 creator Studio: dashboard, upload, video pages, earnings
     fellows/                about Fellows, and the application form
@@ -122,6 +132,7 @@ src/
     comments/               comments, reports, moderation
     collections/            curated collections
     learning/               quizzes, AI quiz drafts, certificates
+    emails/                 email sequences, reply notifications, email settings
     discovery/recommend.ts  "Recommended for you"
     playback/               who may play what, watch sessions and progress
     db/schema.ts            all tables (plan section 5.2)
@@ -219,7 +230,7 @@ Under every Community video and lesson (`src/lib/comments/`).
 - **Moderation.** Viewers report (one open report per person); at 3 reporters the comment hides
   until an admin decides at `/admin/comments` (reported first): restore (dismisses the reports),
   hide, or remove. Authors see their own hidden comment marked as under review.
-- **Not yet.** Email notifications for replies wait for notification preferences and unsubscribe.
+- **Reply emails.** Whoever started a conversation gets an email when someone replies (see Email).
 
 ## Discovery
 
@@ -257,6 +268,42 @@ Under every Community video and lesson (`src/lib/comments/`).
   ("Print / Save as PDF"), and offers its owner "Add to LinkedIn". The name and course title
   are kept as issued. A revoked certificate's page says it's no longer valid. My Learning
   lists a person's certificates.
+
+## Email
+
+`src/lib/emails/`. Admins see every sequence, its numbers and a preview of each email (with a
+"Send a test to me" button) at `/admin/emails`.
+
+- **Sequences** (`sequences.ts`), checked every 15 minutes:
+  - **Welcome**, for new accounts without a membership: right away (where to start, including a
+    free lesson), day 2 (Community Voices), day 5 (what membership includes). Ends if they join.
+  - **New member**: right away (where to begin), day 3 (continue the lesson they started, or a nudge
+    to start), day 10 (certificates, Community Voices picks). Ends if the membership does.
+  - **Come back**, for members who haven't watched anything in 14 days (counted from their latest
+    membership start): one email leading with the lesson they left unfinished, or what's new. At
+    most once a month; ends if they're watching again.
+  - **Win-back**, 3 days after a membership ends: what they finished (progress is kept), then on
+    day 30 the courses added since they left, only if there are any. Ends if they rejoin. Once per
+    person.
+- **Each email is written just before it's sent** from what the person has actually done, so it
+  never suggests a finished lesson or a membership they already have, and a step with nothing
+  useful to say is skipped rather than sent. Links carry `utm_campaign` tags.
+- **Reply notifications.** The person who started a conversation hears about replies to it,
+  at most one email per conversation every 6 hours, never for their own replies, and not for
+  hidden comments.
+- **Settings.** Three things people can turn off: "Getting started and staying on track" (the
+  first three sequences), "New courses and news" (win-back) and "Replies to your comments".
+  Account, billing, gift and creator review emails are always sent. Every optional email
+  has an unsubscribe link (works signed out, confirms before changing anything) and a one-click
+  `List-Unsubscribe` header for mail apps (RFC 8058, required by Gmail and Yahoo for bulk
+  senders). Settings are also on the account page.
+- **Delivery.** Sending is safe to retry and to run twice at once: each email has a unique key,
+  used as Resend's idempotency key, and due emails are claimed with a short lease. A failed send
+  is retried twice (15 minutes apart), then that email is skipped. Everything sent, skipped or
+  failed is logged in `email_sends`.
+- **At launch:** the welcome series only goes to accounts under 3 days old and onboarding to
+  memberships under a week old, but "Come back" and win-back go to everyone who qualifies on the
+  first run.
 
 ## Ratings and reviews
 
@@ -380,6 +427,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates. Before launch: configure the production services (Stripe,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications. Before launch: configure the production services (Stripe,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

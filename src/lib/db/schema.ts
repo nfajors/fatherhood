@@ -891,3 +891,74 @@ export const certificates = pgTable(
   },
   (t) => [uniqueIndex("certificates_user_course_idx").on(t.userId, t.courseId)],
 );
+
+// ---------------------------------------------------------------------------
+// Email: preferences, sequences and the send log
+// ---------------------------------------------------------------------------
+
+/**
+ * What people can opt out of. Account, billing, gift and creator review email
+ * is transactional and always sent.
+ */
+export const emailCategory = pgEnum("email_category", ["learning", "announcements", "replies"]);
+export type EmailCategory = (typeof emailCategory.enumValues)[number];
+
+/** One row per person who changed a setting; no row means everything is on. */
+export const emailPreferences = pgTable("email_preferences", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  learning: boolean("learning").notNull().default(true),
+  announcements: boolean("announcements").notNull().default(true),
+  replies: boolean("replies").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const emailEnrollmentStatus = pgEnum("email_enrollment_status", ["active", "completed", "exited"]);
+
+/** A person's place in an email sequence (sequences are defined in code: src/lib/email-sequences). */
+export const emailEnrollments = pgTable(
+  "email_enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sequence: text("sequence").notNull(),
+    status: emailEnrollmentStatus("status").notNull().default("active"),
+    /** Index of the next step to send. */
+    step: smallint("step").notNull().default(0),
+    /** When the next step is due (also used as a short lease while it sends). */
+    nextAt: timestamp("next_at", { withTimezone: true }),
+    /** Failed sends of the current step. */
+    attempts: smallint("attempts").notNull().default(0),
+    enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    exitReason: text("exit_reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("email_enrollments_user_sequence_idx").on(t.userId, t.sequence), index("email_enrollments_due_idx").on(t.status, t.nextAt)],
+);
+
+export const emailSendStatus = pgEnum("email_send_status", ["sent", "failed", "skipped"]);
+
+/** Every sequence email and notification, keyed so nothing is sent twice. */
+export const emailSends = pgTable(
+  "email_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Unique per email, e.g. "seq:{enrollment}:{cycle}:{step}" or "reply:{thread}:{user}:{window}". */
+    key: text("key").notNull().unique(),
+    category: emailCategory("category").notNull(),
+    sequence: text("sequence"),
+    step: text("step"),
+    subject: text("subject").notNull(),
+    status: emailSendStatus("status").notNull(),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("email_sends_user_created_idx").on(t.userId, t.createdAt), index("email_sends_sequence_idx").on(t.sequence, t.step, t.createdAt)],
+);

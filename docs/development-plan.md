@@ -332,6 +332,8 @@ real engagement data exists.
 - Certificates, quizzes.
 - Mobile-responsive excellence + PWA.
 - Email sequences, recommendations.
+  *Built October 18, 2026:* welcome, new-member, come-back and win-back sequences written from
+  each person's progress, reply notifications, email settings with one-click unsubscribe.
 - Automated payouts (Stripe Connect).
 - Analytics dashboards.
 

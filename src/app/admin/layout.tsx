@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/admin/comments", label: "Comments" },
   { href: "/admin/collections", label: "Collections" },
   { href: "/admin/themes", label: "Themes" },
+  { href: "/admin/emails", label: "Emails" },
 ];
 
 /** Admin area: hidden (404) from everyone but admins. */
