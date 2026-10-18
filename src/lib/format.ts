@@ -16,3 +16,18 @@ export function formatClock(seconds: number): string {
   const sec = String(s % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
+
+/** "$12.34". */
+export function formatMoney(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+/** Watch time: "0 min", "45 min", "3 hr 20 min". */
+export function formatWatchTime(seconds: number): string {
+  return formatDuration(seconds) || "0 min";
+}
+
+/** "980", "1.3K", "12.9K", "4.2M". */
+export function formatCount(value: number): string {
+  return value < 1000 ? String(value) : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/config";
-import { ErrorText, useAdminAction } from "./use-admin-action";
+import { ErrorText, useApiAction } from "@/components/use-api-action";
 
 const field = "mt-1 block w-full rounded-md border border-navy-900/20 bg-white px-3 py-2";
 
@@ -57,7 +57,7 @@ type CourseFields = {
 };
 
 export function CourseDetailsForm({ course, instructors }: { course: CourseFields; instructors: { id: string; name: string }[] }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [saved, setSaved] = useState(false);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,7 +144,7 @@ export function CourseDetailsForm({ course, instructors }: { course: CourseField
 }
 
 export function PublishToggle({ courseId, published }: { courseId: string; published: boolean }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   return (
     <div>
       <Button
@@ -160,7 +160,7 @@ export function PublishToggle({ courseId, published }: { courseId: string; publi
 }
 
 export function AddModuleForm({ courseId }: { courseId: string }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -181,7 +181,7 @@ export function AddModuleForm({ courseId }: { courseId: string }) {
 }
 
 export function ModuleControls({ moduleId, title, first, last }: { moduleId: string; title: string; first: boolean; last: boolean }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const url = `/api/admin/courses/modules/${moduleId}`;
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -232,7 +232,7 @@ function VideoSelect({ name, videos, defaultValue }: { name: string; videos: Vid
 }
 
 export function AddLessonForm({ moduleId, videos }: { moduleId: string; videos: VideoOption[] }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
@@ -294,7 +294,7 @@ export function LessonRow({
   first: boolean;
   last: boolean;
 }) {
-  const { pending, error, run } = useAdminAction();
+  const { pending, error, run } = useApiAction();
   const [editing, setEditing] = useState(false);
   const url = `/api/admin/courses/lessons/${lesson.id}`;
   const options = lesson.videoId && !videos.some((v) => v.id === lesson.videoId)

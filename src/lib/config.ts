@@ -25,6 +25,9 @@ export const COMMUNITY_MAX_DURATION_SECONDS = 8 * 60;
 /** Upper bound for professional lessons (Stream requires a value; lessons run 8-20 min). */
 export const PROFESSIONAL_MAX_DURATION_SECONDS = 2 * 60 * 60;
 
+/** Largest file accepted per upload, a sanity cap; Stream bills by minutes, not bytes. */
+export const MAX_UPLOAD_BYTES = { community: 5 * 1024 ** 3, professional: 30 * 1024 ** 3 } as const;
+
 /**
  * Lifetime of signed playback tokens for paid content. Stream checks the token
  * as segments load, so it must outlast a paused-and-resumed lesson.

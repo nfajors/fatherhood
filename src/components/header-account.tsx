@@ -28,6 +28,11 @@ export function HeaderAccount() {
           <Link href="/admin/moderation">Admin</Link>
         </Button>
       )}
+      {(role === "creator" || role === "admin") && (
+        <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
+          <Link href="/studio">Studio</Link>
+        </Button>
+      )}
       <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
         <Link href="/learning">My Learning</Link>
       </Button>

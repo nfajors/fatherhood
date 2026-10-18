@@ -145,6 +145,9 @@ Two distinct sections:
   - Metadata: title, description, tags, category, transcript upload or AI generation.
   - Length validation (reject or truncate >8 min for Community; professional can be longer).
 - Dashboard for creators: views, watch time, ratings, estimated earnings, upload status.
+  Creators' views of their own videos don't count toward views or the pool. After a reviewer
+  requests changes, the creator edits and resubmits or uploads a new version, and a person
+  reviews the resubmission (it is never auto-approved).
 - Branding standardization is mandatory — no custom intros that break visual consistency.
 
 ### 3.4 Moderation & Approval

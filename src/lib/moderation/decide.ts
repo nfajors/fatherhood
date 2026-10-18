@@ -31,6 +31,8 @@ export function decide(input: {
   result: ScreenResult;
   /** Has a person approved one of this creator's videos before? */
   creatorHasHumanApproval: boolean;
+  /** Did a reviewer ask for changes to this video? Then a person checks the resubmission. */
+  reviewerRequestedChanges?: boolean;
 }): Decision {
   const { result } = input;
   const risk = overallRisk(result);
@@ -52,6 +54,7 @@ export function decide(input: {
   if (rules.requirePriorHumanApproval && !input.creatorHasHumanApproval) {
     reasons.push("This creator's first video needs a human review.");
   }
+  if (input.reviewerRequestedChanges) reasons.push("A reviewer asked for changes, so a person checks the resubmission.");
 
   return { autoApprove: reasons.length === 0, risk, priority, reasons };
 }

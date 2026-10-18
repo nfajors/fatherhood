@@ -38,8 +38,13 @@ export async function recordHeartbeat(
   const position = Math.max(0, Math.floor(beat.positionSeconds));
 
   return db.transaction(async (tx) => {
-    const [video] = await tx.select({ durationSeconds: videos.durationSeconds }).from(videos).where(eq(videos.id, beat.videoId));
+    const [video] = await tx
+      .select({ durationSeconds: videos.durationSeconds, creatorId: videos.creatorId })
+      .from(videos)
+      .where(eq(videos.id, beat.videoId));
     const duration = video?.durationSeconds ?? null;
+    // Creators watching their own videos keep their place but earn no views (or pool share).
+    const ownVideo = beat.userId !== null && beat.userId === video?.creatorId;
     const clampedPosition = duration ? Math.min(position, duration) : position;
 
     let sessionId = beat.sessionId;
@@ -51,7 +56,7 @@ export async function recordHeartbeat(
         throw new PlaybackError("session_mismatch", "This playback session belongs to someone else.");
       }
       before = session.secondsWatched;
-      credited = creditWatchTime(beat.watchedSeconds, session.lastHeartbeatAt, now);
+      credited = ownVideo ? 0 : creditWatchTime(beat.watchedSeconds, session.lastHeartbeatAt, now);
       await tx
         .update(watchSessions)
         .set({

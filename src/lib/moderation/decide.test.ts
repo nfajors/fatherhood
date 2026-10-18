@@ -43,6 +43,7 @@ describe("decide", () => {
   it.each([
     ["professional videos", { type: "professional" as const }, {}, /Professional videos/],
     ["a creator's first video", { creatorHasHumanApproval: false }, {}, /first video/],
+    ["a resubmission after a change request", { reviewerRequestedChanges: true }, {}, /asked for changes/],
     ["no transcript", {}, { hadTranscript: false }, /No transcript/],
     ["low relevance", {}, { relevance: 79 }, /Relevance 79 is below 80/],
     ["a review recommendation", {}, { recommendation: "review" as const }, /recommends "review"/],
