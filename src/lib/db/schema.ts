@@ -617,7 +617,13 @@ export const creatorApplications = pgTable(
   ],
 );
 
+/**
+ * pending: waiting to be sent (or retried after a temporary failure, see failure_reason);
+ * processing: a transfer attempt is in flight; paid: sent by Stripe transfer or marked
+ * paid by an admin; failed: Stripe refused it or the transfer was reversed (an admin retries).
+ */
 export const payoutStatus = pgEnum("payout_status", ["pending", "processing", "paid", "failed"]);
+export type PayoutStatus = (typeof payoutStatus.enumValues)[number];
 
 export const creatorPayouts = pgTable(
   "creator_payouts",
@@ -631,12 +637,46 @@ export const creatorPayouts = pgTable(
     amountCents: integer("amount_cents").notNull(),
     status: payoutStatus("status").notNull().default("pending"),
     stripeTransferId: text("stripe_transfer_id").unique(),
+    /** Why the last attempt did not go through (kept on a pending payout that will be retried). */
     failureReason: text("failure_reason"),
+    /** Transfer attempts so far; each attempt has its own Stripe idempotency key. */
+    attempts: smallint("attempts").notNull().default(0),
+    /** Start of the latest attempt; a "processing" payout older than the lease is checked and retried. */
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    /** When the creator was asked to set up payouts for this payout (sent once). */
+    setupReminderSentAt: timestamp("setup_reminder_sent_at", { withTimezone: true }),
+    /** Set when an admin recorded a payment made outside Stripe Connect. */
+    markedPaidById: text("marked_paid_by_id").references(() => user.id, { onDelete: "set null" }),
+    manualNote: text("manual_note"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("creator_payouts_creator_id_idx").on(t.creatorId)],
+  (t) => [index("creator_payouts_creator_id_idx").on(t.creatorId), index("creator_payouts_status_idx").on(t.status)],
 );
+
+/**
+ * A creator's Stripe Connect (Express) account, which receives payouts.
+ * Mirrors the account's state from Stripe (account.updated webhooks and on return from onboarding).
+ */
+export const creatorPayoutAccounts = pgTable("creator_payout_accounts", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  stripeAccountId: text("stripe_account_id").notNull().unique(),
+  detailsSubmitted: boolean("details_submitted").notNull().default(false),
+  payoutsEnabled: boolean("payouts_enabled").notNull().default(false),
+  /** The account's `transfers` capability is active, so we can send it money. */
+  transfersActive: boolean("transfers_active").notNull().default(false),
+  /** Stripe's currently_due and past_due requirements. */
+  requirementsDue: text("requirements_due")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  disabledReason: text("disabled_reason"),
+  /** The creator disconnected the account from our platform in Stripe. */
+  disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  ...timestamps,
+});
 
 // ---------------------------------------------------------------------------
 // Revenue share (policy in lib/revenue/policy.ts)

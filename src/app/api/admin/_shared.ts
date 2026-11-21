@@ -9,6 +9,8 @@ import { ResourceError } from "@/lib/courses/resources";
 import { QuizDraftError } from "@/lib/learning/quiz-drafter";
 import { QuizError } from "@/lib/learning/quizzes";
 import { ModerationError } from "@/lib/moderation/service";
+import { PayoutError } from "@/lib/payouts/service";
+import { SettlementError } from "@/lib/revenue/settlement";
 import { RatingError } from "@/lib/ratings/service";
 import { ThemeServiceError } from "@/lib/themes/service";
 
@@ -50,6 +52,10 @@ export async function asAdmin(handler: (admin: SessionUser) => Promise<Response>
       return NextResponse.json({ error: error.reason, message: error.message }, { status: QUIZ_STATUS[error.reason] });
     }
     if (error instanceof QuizDraftError) return NextResponse.json({ error: "draft_failed", message: error.message }, { status: 502 });
+    if (error instanceof PayoutError) {
+      return NextResponse.json({ error: error.reason, message: error.message }, { status: error.reason === "not_found" ? 404 : 409 });
+    }
+    if (error instanceof SettlementError) return NextResponse.json({ error: "settlement", message: error.message }, { status: 409 });
     if (error instanceof ModerationError) {
       return NextResponse.json({ error: error.reason, message: error.message }, { status: MODERATION_STATUS[error.reason] });
     }

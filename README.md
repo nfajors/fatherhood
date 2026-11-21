@@ -32,7 +32,7 @@ npm run dev                  # http://localhost:3000
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run gifts:deliver` | Send scheduled gift emails that are due, and retry failed sends |
 | `npm run emails:run` | Enroll people in email sequences and send what's due (what the cron does) |
-| `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month) |
+| `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month; the monthly cron does this) |
 
 Environment variables are validated per integration when first used
 (`src/lib/env.ts`), so the app builds and tests run without secrets.
@@ -49,7 +49,8 @@ marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
 `BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
 **Scheduled jobs.** Set `CRON_SECRET`. On Vercel, `vercel.json` runs `/api/cron/gift-delivery`
-hourly, `/api/cron/moderation` every 10 minutes and `/api/cron/email-sequences` every 15 minutes
+hourly, `/api/cron/moderation` every 10 minutes, `/api/cron/email-sequences` every 15 minutes,
+`/api/cron/payouts` daily and `/api/cron/revenue-settlement` on the 2nd of each month
 (sub-daily crons need a paid Vercel plan). On other hosts, call them with
 `Authorization: Bearer $CRON_SECRET` on the same schedule.
 
@@ -64,8 +65,8 @@ Paid access is not a role: it is derived from the `subscriptions` table.
 1. Create a product with two recurring prices ($19/month, $199/year) and set
    `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL`.
 2. Add a webhook endpoint at `/api/stripe/webhook` for `checkout.session.completed`,
-   `checkout.session.async_payment_succeeded`, `customer.subscription.*`, `invoice.paid`
-   and `charge.refunded`, then set `STRIPE_WEBHOOK_SECRET`.
+   `checkout.session.async_payment_succeeded`, `customer.subscription.*`, `invoice.paid`,
+   `charge.refunded` and `transfer.reversed`, then set `STRIPE_WEBHOOK_SECRET`.
    Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 3. Turn on the customer portal (members manage billing from `/account`).
 
@@ -90,6 +91,9 @@ src/
     api/stripe/checkout     start a membership (Stripe Checkout)
     api/stripe/portal       Stripe customer portal
     api/stripe/webhook      sync subscriptions (idempotent)
+    api/stripe/connect-webhook  creators' payout account status (Stripe Connect)
+    api/studio/payouts/...  payout setup (Stripe onboarding) and the Express dashboard link
+    api/admin/payouts/...   send a payout, record one paid another way, settle a month
     api/studio/videos/...   creator uploads (resumable, straight to Cloudflare), edits, resubmission
     api/fellows/apply       apply for Fellow (upload) access
     api/videos/[id]/rating  rate a video, with an optional review
@@ -407,8 +411,49 @@ Same model as Winning Careers (details in plan section 3.5, constants in
   the pool is split in proportion to score.
 - Balances of $20+ become pending payouts; smaller balances carry forward.
 
-Run `npm run revenue:settle` monthly (e.g. on the 1st). Re-running a settled month
-returns the stored result; `--force` recalculates it unless it has already been paid out.
+Settlement runs automatically on the 2nd of each month (`/api/cron/revenue-settlement`, a day's
+margin for late invoice webhooks); admins can also settle a month from `/admin/payouts`, and
+`npm run revenue:settle` does the same from a terminal. Re-running a settled month returns the
+stored result; `--force` recalculates it unless it has already been paid out.
+
+## Creator payouts (Stripe Connect)
+
+`src/lib/payouts/`. Settlement creates each payout as pending; this sends them.
+
+- **Setting up.** On `/studio/earnings` a Fellow with earnings sets up payouts: we create a Stripe
+  Express account (US, individual, `transfers` capability) and send them to Stripe's onboarding for
+  their name, bank account and tax details. Stripe keeps those; we never see them. Back on the
+  Earnings page we read the account's state straight away; after that the Connect webhook keeps it
+  in sync. The page shows what's next (set up, finish, being verified, ready) and, once details are
+  in, a link to their Stripe Express dashboard for bank details, deposits and tax forms.
+- **Sending.** A payout is a Stripe transfer from the platform balance to the creator's account;
+  Stripe then deposits it in their bank on their payout schedule. The creator is emailed when it's sent.
+  Admins send from `/admin/payouts` ("Send now"). With `PAYOUTS_AUTO_SEND=true` the daily run
+  (`/api/cron/payouts`) also sends every payout that is at least 3 days old (time to check a
+  settlement and re-run it before money moves) to creators whose account is ready.
+- **Never twice.** Each attempt claims the payout first, uses its own idempotency key, and from the
+  second attempt on asks Stripe for a transfer already made for the payout (`transfer_group` is
+  the payout id), so an attempt cut off after Stripe accepted it is recorded, not repeated. An
+  attempt still "sending" after 15 minutes is checked and retried.
+- **When it doesn't go through.** A temporary problem (the platform balance isn't available yet,
+  a Stripe outage) keeps the payout waiting with the reason shown, and the next run tries again. A
+  refusal (for example a restricted account) marks it failed for an admin to fix and send again.
+  A transfer reversed in Stripe returns the payout to failed.
+- **Waiting on the creator.** A payout whose creator hasn't finished setup stays reserved for them;
+  the daily run emails them once per payout with a link to set up.
+- **Paid another way.** Admins can record a payout paid by check or bank transfer, with a note.
+
+Setup:
+1. In Stripe, turn on Connect and choose Express accounts. Set your platform's branding and, for
+   1099s, turn on tax reporting for connected accounts.
+2. Add a second webhook endpoint at `/api/stripe/connect-webhook` that listens to **events on
+   connected accounts** for `account.updated` and `account.application.deauthorized`; set
+   `STRIPE_CONNECT_WEBHOOK_SECRET`. Locally:
+   `stripe listen --forward-connect-to localhost:3000/api/stripe/connect-webhook`.
+3. Add `transfer.reversed` to the main webhook endpoint's events.
+4. Payouts draw on the platform's available Stripe balance, so leave enough of each month's
+   revenue in Stripe (25% of it funds the pool).
+5. Once a payout has gone through by hand, turn on `PAYOUTS_AUTO_SEND=true`.
 
 ## Code reused from Winning
 
@@ -427,6 +472,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications. Before launch: configure the production services (Stripe,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect). Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

@@ -6,6 +6,7 @@ import { processedWebhookEvents, revenueLedger, subscriptions, user } from "@/li
 import { stripeEnv } from "@/lib/env";
 import { recordGiftPayment, sendGiftEmails, stripeCredits } from "@/lib/gifts/runtime";
 import { refundGiftPayment } from "@/lib/gifts/service";
+import { recordTransferReversal } from "@/lib/payouts/service";
 import { getStripe, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
 
 const SUBSCRIPTION_EVENTS = new Set([
@@ -19,7 +20,8 @@ const SUBSCRIPTION_EVENTS = new Set([
 /**
  * Stripe webhook: keeps `subscriptions` in sync, which is what grants access,
  * records paid subscription invoices in the revenue ledger that funds the
- * creator pool, and fulfils and refunds gift memberships. Each event id is
+ * creator pool, fulfils and refunds gift memberships, and notices creator payout
+ * transfers reversed in Stripe. Each event id is
  * recorded so Stripe's retries are processed once.
  */
 export async function POST(request: Request) {
@@ -49,6 +51,12 @@ export async function POST(request: Request) {
     if (paymentIntentId) {
       await refundGiftPayment(getDb(), { paymentIntentId, fullyRefunded: charge.refunded }, stripeCredits);
     }
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === "transfer.reversed") {
+    const transfer = event.data.object as Stripe.Transfer;
+    await recordTransferReversal(getDb(), { id: transfer.id, amountCents: transfer.amount, amountReversedCents: transfer.amount_reversed });
     return NextResponse.json({ received: true });
   }
 

@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { PayoutAccountCard } from "@/components/payouts/payout-account-card";
 import { EligibilityChecklist, Stat } from "@/components/studio/earnings";
 import { Card } from "@/components/ui/card";
 import { getSessionUser } from "@/lib/auth";
 import { earningsEstimate, earningsHistory } from "@/lib/creators/dashboard";
 import { getDb } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
+import { stripePayouts } from "@/lib/payouts/runtime";
+import { payoutAccountStatus, refreshPayoutAccount } from "@/lib/payouts/service";
 import { REVENUE_POLICY as P } from "@/lib/revenue/policy";
 
 export const metadata: Metadata = { title: "Earnings", robots: { index: false } };
@@ -12,13 +15,23 @@ export const metadata: Metadata = { title: "Earnings", robots: { index: false } 
 const month = (d: Date) => d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const day = (d: Date) => d.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
 
-const PAYOUT_STATUS = { pending: "Scheduled", processing: "Sending", paid: "Paid", failed: "Failed" } as const;
+const PAYOUT_STATUS = { pending: "Scheduled", processing: "Sending", paid: "Paid", failed: "Delayed" } as const;
 
-export default async function EarningsPage() {
+export default async function EarningsPage({ searchParams }: { searchParams: Promise<{ payouts?: string }> }) {
   const sessionUser = (await getSessionUser())!;
   const db = getDb();
-  const [estimate, history] = await Promise.all([earningsEstimate(db, sessionUser.id), earningsHistory(db, sessionUser.id)]);
+  // Back from Stripe onboarding: read the account now rather than wait for the webhook.
+  if ((await searchParams).payouts === "return") {
+    await refreshPayoutAccount(db, stripePayouts, sessionUser.id).catch((error: unknown) => console.error("Payout account refresh failed", error));
+  }
+  const [estimate, history, account] = await Promise.all([
+    earningsEstimate(db, sessionUser.id),
+    earningsHistory(db, sessionUser.id),
+    payoutAccountStatus(db, sessionUser.id),
+  ]);
   const { balances } = history;
+  const waitingCents = balances.inPayoutCents + history.payouts.filter((p) => p.status === "failed").reduce((t, p) => t + p.amountCents, 0);
+  const hasEarned = history.shares.length > 0 || estimate.estimatedCents > 0 || history.payouts.length > 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -38,6 +51,12 @@ export default async function EarningsPage() {
         <Stat label="Payout on the way" value={formatMoney(balances.inPayoutCents)} />
         <Stat label="Paid to date" value={formatMoney(balances.paidCents)} />
       </section>
+
+      {(hasEarned || account.readiness !== "none") && (
+        <div className="mt-8">
+          <PayoutAccountCard readiness={account.readiness} waitingCents={waitingCents} />
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[20rem_1fr]">
         <Card>
@@ -113,25 +132,30 @@ export default async function EarningsPage() {
           <h2 id="payouts" className="text-2xl font-semibold">
             Payouts
           </h2>
-          <table className="mt-4 w-full max-w-xl text-left text-sm">
-            <thead className="text-muted">
-              <tr>
-                <th className="py-2 font-normal">Date</th>
-                <th className="py-2 font-normal">Status</th>
-                <th className="py-2 text-right font-normal">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.payouts.map((p) => (
-                <tr key={p.id} className="border-t border-navy-900/5">
-                  <td className="py-2">{day(p.paidAt ?? p.createdAt)}</td>
-                  <td className="py-2">{PAYOUT_STATUS[p.status]}</td>
-                  <td className="py-2 text-right tabular-nums">{formatMoney(p.amountCents)}</td>
+          <div className="overflow-x-auto">
+            <table className="mt-4 w-full max-w-xl text-left text-sm">
+              <thead className="text-muted">
+                <tr>
+                  <th className="py-2 font-normal">Date</th>
+                  <th className="py-2 font-normal">Status</th>
+                  <th className="py-2 text-right font-normal">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-3 text-xs text-muted">Payouts are sent by our team for now. Questions about a payout? Reply to any email from us.</p>
+              </thead>
+              <tbody>
+                {history.payouts.map((p) => (
+                  <tr key={p.id} className="border-t border-navy-900/5">
+                    <td className="py-2">{day(p.paidAt ?? p.createdAt)}</td>
+                    <td className="py-2">{PAYOUT_STATUS[p.status]}</td>
+                    <td className="py-2 text-right tabular-nums">{formatMoney(p.amountCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Payouts go to your Stripe account a few days after each month is settled, and Stripe deposits them in your bank. Questions about a
+            payout? Reply to any email from us.
+          </p>
         </section>
       )}
     </div>

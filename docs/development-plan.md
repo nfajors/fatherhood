@@ -335,6 +335,9 @@ real engagement data exists.
   *Built October 18, 2026:* welcome, new-member, come-back and win-back sequences written from
   each person's progress, reply notifications, email settings with one-click unsubscribe.
 - Automated payouts (Stripe Connect).
+  *Built November 21, 2026:* Express onboarding from the Studio, monthly settlement and daily
+  transfers on a schedule (with a 3-day hold and an admin switch), retries that never pay twice,
+  setup reminders, and an admin payouts page.
 - Analytics dashboards.
 
 **Phase 3 – Scale (Year 2+)**
