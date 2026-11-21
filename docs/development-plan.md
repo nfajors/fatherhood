@@ -339,6 +339,8 @@ real engagement data exists.
   transfers on a schedule (with a 3-day hold and an admin switch), retries that never pay twice,
   setup reminders, and an admin payouts page.
 - Analytics dashboards.
+  *Built November 21, 2026:* `/admin/analytics` with membership (members over time, MRR, churn),
+  revenue, sign-ups and conversion, viewing, learning and community figures over 7/30/90 days.
 
 **Phase 3 – Scale (Year 2+)**
 - Native mobile apps (offline).

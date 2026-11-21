@@ -6,6 +6,7 @@ import { getAdminUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const LINKS = [
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/moderation", label: "Moderation" },
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/creators", label: "Fellows" },

@@ -199,6 +199,25 @@ visible only to their creator and admins.
 - **Own views don't count.** A creator watching their own video keeps their place but earns
   no views or pool share.
 
+## Analytics
+
+`/admin/analytics` (`src/lib/analytics/`): the last 7, 30 or 90 days (UTC), each figure compared
+with the same number of days before.
+
+- **Membership.** Members today and per day, by plan; monthly recurring revenue (annual plans at a
+  twelfth; gifts aren't recurring); memberships started and ended, and churn (ended in the range per
+  member at its start). Past days are estimated from each membership's start, period end and
+  cancellation, since we keep current rows, not a history.
+- **Revenue.** Paid invoices and gift purchases from the revenue ledger, by month for a year, and
+  what the range adds to the creator pool. Before Stripe's fees and later refunds.
+- **Sign-ups** per day, and how many of those people have become members.
+- **Viewing.** Views per day (30 seconds or more, the creator-pool rule), watch time, Academy vs
+  Community, signed-in viewers and signed-out views, and the most-watched videos.
+- **Learning and community.** Learners and certificates per course, quiz pass rate, comments,
+  ratings, videos published, and links to what's waiting (review queue, reports, Fellow applications).
+
+Each chart has a "View as table" twin, and values show on hover and keyboard focus.
+
 ## Lesson downloads
 
 Workbooks, PDFs and insight cards attached to lessons, stored in a private Cloudflare R2 bucket
@@ -472,6 +491,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect). Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).
