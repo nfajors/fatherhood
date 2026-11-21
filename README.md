@@ -90,6 +90,8 @@ src/
     api/auth/[...all]       Better Auth
     api/stripe/checkout     start a membership (Stripe Checkout)
     api/stripe/portal       Stripe customer portal
+    manifest.ts, offline/   installable app and the page shown without a connection
+    admin/analytics         membership, revenue, viewing and learning figures
     api/stripe/webhook      sync subscriptions (idempotent)
     api/stripe/connect-webhook  creators' payout account status (Stripe Connect)
     api/studio/payouts/...  payout setup (Stripe onboarding) and the Express dashboard link
@@ -217,6 +219,23 @@ with the same number of days before.
   ratings, videos published, and links to what's waiting (review queue, reports, Fellow applications).
 
 Each chart has a "View as table" twin, and values show on hover and keyboard focus.
+
+## Installable app (PWA) and phones
+
+- **Install.** `src/app/manifest.ts` makes the site installable from Chrome, Edge and Android
+  ("Install the app" appears in the footer where the browser offers it) and from Safari's Share >
+  Add to Home Screen. It opens on My Learning, full screen in the brand navy, with shortcuts to
+  My Learning, Community Voices and the Academy. Icons: `src/app/icon.svg`, `favicon.ico`,
+  `apple-icon.png` and `public/icons/` (regular and maskable).
+- **Service worker** (`public/sw.js`, registered in production builds only). Pages always come from
+  the network and are never cached, so nothing personal stays on a shared phone and nobody sees a
+  stale paywall; with no connection, the offline page (`/offline`) is shown instead. Hashed build
+  files and icons are cached on first use. API calls and video (Cloudflare) are never touched.
+  To ship a change to the worker itself, bump `VERSION` in it; old caches are removed on activate.
+- **Phones and tablets.** Below 1280px the header is the logo, search, Join (signed out) and a
+  menu with every main and account link as a full-width list (closes on navigation or Escape).
+  The installed app pads for notches (`viewport-fit=cover` and safe-area insets). Every page was
+  checked at 390px wide, signed out, as a member, a Fellow and an admin, for sideways scrolling.
 
 ## Lesson downloads
 
@@ -491,6 +510,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 so far: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics. Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

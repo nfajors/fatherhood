@@ -331,6 +331,8 @@ real engagement data exists.
 - Enhanced community (comments, better discovery).
 - Certificates, quizzes.
 - Mobile-responsive excellence + PWA.
+  *Built November 21, 2026:* web app manifest and icons, a service worker with an offline page
+  (pages never cached), an install button, a phone/tablet menu, and a 390px check of every page.
 - Email sequences, recommendations.
   *Built October 18, 2026:* welcome, new-member, come-back and win-back sequences written from
   each person's progress, reply notifications, email settings with one-click unsubscribe.

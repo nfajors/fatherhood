@@ -4,7 +4,17 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-/** Right side of the header. Client-side, so marketing pages stay static. */
+/** Account links for the signed-in user's role, in header order. */
+export function accountLinks(role: string | undefined) {
+  return [
+    ...(role === "admin" ? [{ href: "/admin/moderation", label: "Admin" }] : []),
+    ...(role === "creator" || role === "admin" ? [{ href: "/studio", label: "Studio" }] : []),
+    { href: "/learning", label: "My Learning" },
+    { href: "/account", label: "Account" },
+  ];
+}
+
+/** Right side of the header on wide screens. Client-side, so marketing pages stay static. */
 export function HeaderAccount() {
   const { data, isPending } = authClient.useSession();
   if (isPending) return <div className="h-9 w-32" aria-hidden />;
@@ -20,25 +30,13 @@ export function HeaderAccount() {
       </div>
     );
   }
-  const role = (data.user as { role?: string }).role;
   return (
     <div className="flex items-center gap-1 text-sm">
-      {role === "admin" && (
-        <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
-          <Link href="/admin/moderation">Admin</Link>
+      {accountLinks((data.user as { role?: string }).role).map((l) => (
+        <Button key={l.href} asChild variant="ghost" size="sm" className="whitespace-nowrap text-white hover:bg-white/10">
+          <Link href={l.href}>{l.label}</Link>
         </Button>
-      )}
-      {(role === "creator" || role === "admin") && (
-        <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
-          <Link href="/studio">Studio</Link>
-        </Button>
-      )}
-      <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
-        <Link href="/learning">My Learning</Link>
-      </Button>
-      <Button asChild variant="ghost" size="sm" className="text-white hover:bg-white/10">
-        <Link href="/account">Account</Link>
-      </Button>
+      ))}
     </div>
   );
 }
