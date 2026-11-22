@@ -16,6 +16,7 @@ import {
   courses,
   creatorApplications,
   lessons,
+  posts,
   quizAttempts,
   ratings,
   revenueLedger,
@@ -390,7 +391,7 @@ export async function coachUsage(db: Database, range: Range) {
 
 export async function community(db: Database, range: Range) {
   const inRange = (column: Parameters<typeof gte>[0]) => and(gte(column, range.start), lt(column, range.end));
-  const [[c], [r], [published], [queue], [reports], [fellows], [applications]] = await Promise.all([
+  const [[c], [r], [published], [queue], [reports], [fellows], [applications], [discussion]] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(comments).where(and(inRange(comments.createdAt), ne(comments.status, "removed"))),
     db.select({ n: sql<number>`count(*)::int`, reviews: sql<number>`(count(*) filter (where ${ratings.review} is not null))::int` }).from(ratings).where(inRange(ratings.createdAt)),
     db
@@ -401,6 +402,15 @@ export async function community(db: Database, range: Range) {
     db.select({ n: sql<number>`count(*)::int` }).from(contentReports).where(eq(contentReports.status, "open")),
     db.select({ n: sql<number>`count(*)::int` }).from(user).where(eq(user.role, "creator")),
     db.select({ n: sql<number>`count(*)::int` }).from(creatorApplications).where(eq(creatorApplications.status, "pending")),
+    db
+      .select({
+        posts: sql<number>`(count(*) filter (where ${posts.parentId} is null and ${posts.status} = 'visible'))::int`,
+        replies: sql<number>`(count(*) filter (where ${posts.parentId} is not null and ${posts.status} = 'visible'))::int`,
+        authors: sql<number>`count(distinct ${posts.authorId})::int`,
+        held: sql<number>`(count(*) filter (where ${posts.status} = 'pending'))::int`,
+      })
+      .from(posts)
+      .where(inRange(posts.createdAt)),
   ]);
   return {
     comments: c?.n ?? 0,
@@ -412,6 +422,10 @@ export async function community(db: Database, range: Range) {
     openReports: reports?.n ?? 0,
     fellows: fellows?.n ?? 0,
     pendingApplications: applications?.n ?? 0,
+    discussionPosts: discussion?.posts ?? 0,
+    discussionReplies: discussion?.replies ?? 0,
+    discussionAuthors: discussion?.authors ?? 0,
+    discussionHeld: discussion?.held ?? 0,
   };
 }
 

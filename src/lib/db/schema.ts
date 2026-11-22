@@ -1181,3 +1181,131 @@ export const organizationMembers = pgTable(
     index("organization_members_user_id_idx").on(t.userId),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Discussions (lib/discussions): members' posts, groups and follows
+// ---------------------------------------------------------------------------
+
+export const groupStatus = pgEnum("group_status", ["active", "archived"]);
+
+/** Topic groups our team creates (e.g. "New dads", "Co-parenting"); members join to post in them. */
+export const discussionGroups = pgTable("discussion_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  status: groupStatus("status").notNull().default("active"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+});
+
+export const groupRole = pgEnum("group_role", ["member", "moderator"]);
+
+export const discussionGroupMembers = pgTable(
+  "discussion_group_members",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => discussionGroups.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: groupRole("role").notNull().default("member"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.userId] }), index("discussion_group_members_user_idx").on(t.userId)],
+);
+
+/**
+ * pending: held by the AI check (or not checked yet) until a moderator decides;
+ * visible; hidden: by moderators or the report threshold; removed: by its author or a moderator.
+ */
+export const postStatus = pgEnum("post_status", ["pending", "visible", "hidden", "removed"]);
+export type PostStatus = (typeof postStatus.enumValues)[number];
+
+/** A post in the main feed (no group) or a group, or a reply to one (one level of threading). */
+export const posts = pgTable(
+  "posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").references(() => discussionGroups.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id").references((): AnyPgColumn => posts.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    status: postStatus("status").notNull().default("pending"),
+    /** The AI check: when it ran, what it flagged and why (for moderators). */
+    screenedAt: timestamp("screened_at", { withTimezone: true }),
+    screenAttempts: smallint("screen_attempts").notNull().default(0),
+    screenCategories: text("screen_categories")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    screenReason: text("screen_reason"),
+    reviewedById: text("reviewed_by_id").references(() => user.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("posts_feed_idx").on(t.groupId, t.status, t.createdAt),
+    index("posts_parent_idx").on(t.parentId, t.createdAt),
+    index("posts_author_idx").on(t.authorId, t.createdAt),
+    index("posts_status_idx").on(t.status, t.createdAt),
+  ],
+);
+
+/** "Me too": one per person per post. */
+export const postReactions = pgTable(
+  "post_reactions",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+export const postReports = pgTable(
+  "post_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    /** One of REPORT_REASONS (lib/moderation/policy.ts). */
+    reason: text("reason").notNull(),
+    status: reportStatus("status").notNull().default("open"),
+    resolvedById: text("resolved_by_id").references(() => user.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("post_reports_status_idx").on(t.status),
+    uniqueIndex("post_reports_open_per_reporter_idx").on(t.postId, t.reporterId).where(sql`${t.status} = 'open'`),
+  ],
+);
+
+export const follows = pgTable(
+  "follows",
+  {
+    followerId: text("follower_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    followeeId: text("followee_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerId, t.followeeId] }),
+    index("follows_followee_idx").on(t.followeeId),
+    check("follows_not_self", sql`${t.followerId} <> ${t.followeeId}`),
+  ],
+);

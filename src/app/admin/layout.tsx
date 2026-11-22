@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/admin/organizations", label: "Organizations" },
   { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/comments", label: "Comments" },
+  { href: "/admin/discussions", label: "Discussions" },
   { href: "/admin/collections", label: "Collections" },
   { href: "/admin/themes", label: "Themes" },
   { href: "/admin/emails", label: "Emails" },

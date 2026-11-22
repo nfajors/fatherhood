@@ -7,6 +7,7 @@ const NAV = [
   { href: "/themes", label: "Themes" },
   { href: "/academy", label: "Academy" },
   { href: "/community", label: "Community Voices" },
+  { href: "/discussions", label: "Discussions" },
   { href: "/book", label: "The Book" },
   { href: "/pricing", label: "Pricing" },
 ];
@@ -22,12 +23,12 @@ const SearchIcon = () => (
 export function SiteHeader() {
   return (
     <header className="relative border-b border-white/10 bg-navy-950 pt-[env(safe-area-inset-top)] text-white print:hidden">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 xl:py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 xl:py-4">
         <Link href="/" className="shrink-0 font-serif text-xl font-semibold tracking-tight">
           Fatherhood<span className="text-gold-400">.School</span>
           <span className="sr-only"> ({SITE.domain}) home</span>
         </Link>
-        <nav aria-label="Main" className="hidden gap-5 text-sm text-white/80 xl:flex">
+        <nav aria-label="Main" className="hidden gap-4 text-sm text-white/80 xl:flex">
           {NAV.map((item) => (
             <Link key={item.href} href={item.href} className="whitespace-nowrap hover:text-white">
               {item.label}

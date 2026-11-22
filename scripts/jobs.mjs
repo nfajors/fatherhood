@@ -10,6 +10,8 @@
 export const JOBS = [
   // AI pre-screen of new uploads, and review deadlines.
   { name: "moderation", path: "/api/cron/moderation", due: ({ minute }) => minute % 10 === 0 },
+  // Discussion posts the AI check couldn't check when they were written (offset from moderation).
+  { name: "discussions", path: "/api/cron/discussions", due: ({ minute }) => minute % 10 === 5 },
   // Welcome, new-member, come-back and win-back emails.
   { name: "email-sequences", path: "/api/cron/email-sequences", due: ({ minute }) => minute % 15 === 0 },
   // Scheduled gift emails, and retries of failed ones.

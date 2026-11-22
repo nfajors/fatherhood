@@ -221,6 +221,10 @@ describe.skipIf(!url)("analytics (Postgres)", () => {
       openReports: 1,
       fellows: 1,
       pendingApplications: 1,
+      discussionPosts: 0,
+      discussionReplies: 0,
+      discussionAuthors: 0,
+      discussionHeld: 0,
     });
   });
 });

@@ -269,6 +269,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <Kpi label="Videos published" value={String(social.communityVideosPublished + social.academyVideosPublished)} detail={`${social.communityVideosPublished} Community · ${social.academyVideosPublished} Academy`} />
           <Kpi label="Fellows" value={String(social.fellows)} />
         </section>
+        <section aria-label="Discussion numbers" className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Kpi label="Discussion posts" value={social.discussionPosts.toLocaleString("en-US")} detail={`${social.discussionReplies} replies`} />
+          <Kpi label="People posting" value={social.discussionAuthors.toLocaleString("en-US")} />
+          <Kpi label="Held by the AI check" value={String(social.discussionHeld)} detail="Still waiting for a moderator" />
+        </section>
         <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <li>
             <Link href="/admin/moderation" className="underline-offset-2 hover:underline">
@@ -278,6 +283,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <li>
             <Link href="/admin/moderation" className="underline-offset-2 hover:underline">
               {social.openReports} open {plural(social.openReports, "report", "reports")}
+            </Link>
+          </li>
+          <li>
+            <Link href="/discussions/moderate" className="underline-offset-2 hover:underline">
+              Discussion moderation queue
             </Link>
           </li>
           <li>
