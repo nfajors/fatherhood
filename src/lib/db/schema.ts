@@ -1002,3 +1002,72 @@ export const emailSends = pgTable(
   },
   (t) => [index("email_sends_user_created_idx").on(t.userId, t.createdAt), index("email_sends_sequence_idx").on(t.sequence, t.step, t.createdAt)],
 );
+
+// ---------------------------------------------------------------------------
+// AI coach (lib/coach): a member's profile, conversations and learning path
+// ---------------------------------------------------------------------------
+
+/** What a father tells the coach about himself, used to personalize answers and his path. */
+export const coachProfiles = pgTable("coach_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** One of COACH_STAGES (lib/coach/policy.ts). */
+  stage: text("stage").notNull(),
+  /** Free text, e.g. "a son, 4, and a daughter, 9 months". */
+  children: text("children"),
+  /** What he wants to work on, in his words. */
+  goals: text("goals"),
+  ...timestamps,
+});
+
+/** Private to the member: our team never reads these, and the member can delete them. */
+export const coachConversations = pgTable(
+  "coach_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("coach_conversations_user_updated_idx").on(t.userId, t.updatedAt)],
+);
+
+export const coachMessageRole = pgEnum("coach_message_role", ["user", "assistant"]);
+
+export const coachMessages = pgTable(
+  "coach_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => coachConversations.id, { onDelete: "cascade" }),
+    /** Denormalized so the daily limit is one indexed count. */
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: coachMessageRole("role").notNull(),
+    content: text("content").notNull(),
+    /** Assistant turns: the model that answered, token usage, and why it stopped. */
+    model: text("model"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    stopReason: text("stop_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("coach_messages_conversation_idx").on(t.conversationId, t.createdAt), index("coach_messages_user_created_idx").on(t.userId, t.role, t.createdAt)],
+);
+
+/** A member's personalized path: an ordered plan of lessons, courses and Community videos. */
+export const learningPaths = pgTable("learning_paths", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  summary: text("summary").notNull(),
+  /** PathStep[] (lib/coach/path.ts). */
+  steps: jsonb("steps").notNull(),
+  model: text("model").notNull(),
+  ...timestamps,
+});

@@ -41,8 +41,9 @@ Environment variables are validated per integration when first used
 
 ## Services
 
-**Anthropic (AI themes).** Set `ANTHROPIC_API_KEY` to turn on the theme classifier.
-Without it the site works normally and content waits, unthemed, for an admin.
+**Anthropic (AI themes, moderation, quizzes, coach).** Set `ANTHROPIC_API_KEY` to turn on the theme
+classifier, the AI pre-screen, quiz drafts and the coach. Without it the site works normally:
+content waits, unthemed, for an admin, and the coach says it isn't available.
 
 **Email (Resend).** Set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in
 Resend). Without a key, emails are printed to the server log instead of sent. Before sending
@@ -120,6 +121,7 @@ src/
     api/stripe/checkout     start a membership (Stripe Checkout)
     api/stripe/portal       Stripe customer portal
     manifest.ts, offline/   installable app and the page shown without a connection
+    coach/, api/coach/...   the AI coach: conversations (streamed), profile, learning path
     admin/analytics         membership, revenue, viewing and learning figures
     api/stripe/webhook      sync subscriptions (idempotent)
     api/stripe/connect-webhook  creators' payout account status (Stripe Connect)
@@ -265,6 +267,36 @@ Each chart has a "View as table" twin, and values show on hover and keyboard foc
   menu with every main and account link as a full-width list (closes on navigation or Escape).
   The installed app pads for notches (`viewport-fit=cover` and safe-area insets). Every page was
   checked at 390px wide, signed out, as a member, a Fellow and an admin, for sideways scrolling.
+
+## AI coach (Phase 3)
+
+`src/lib/coach/`, at `/coach` for members (and admins). Needs `ANTHROPIC_API_KEY`; without it the
+coach pages say it isn't available. Non-members see what it does and a link to membership.
+
+- **Conversations.** A member talks through what's happening at home. Replies stream in as they're
+  written (`POST /api/coach/messages`, newline-delimited JSON events). The coach is Claude
+  (`claude-opus-5-5`, medium effort; `policy.ts`) with two library tools run by the SDK's tool runner:
+  `search_library` (published lessons, courses and Community Voices stories, by topic) and
+  `read_item` (a lesson's summary and transcript, or a course outline), so it recommends real
+  lessons and links them. It also sees who it's talking to: his profile, courses in progress,
+  recent watching, certificates and learning path (`context.ts`).
+- **Your plan** (`/coach/plan`). The member says where he is (expecting, new dad, teens...), his
+  children and what he wants to work on. Claude plans a path of 4-8 lessons, courses and stories
+  from the published catalog, each with a sentence on why (`path.ts`, structured output; anything
+  not in the catalog is dropped). Steps tick off as he finishes them, and the path shows on My
+  Learning. "Plan again" re-plans from his latest progress.
+- **Safety.** The instructions (`prompt.ts`) keep the coach to fatherhood, make clear it isn't a
+  therapist, doctor or lawyer, and have it give crisis resources (911, 988, the National Domestic
+  Violence Hotline, Childhelp) when anyone may be in danger. The same resources are always on the
+  page, so help never depends on the model. Lesson text and profile text are treated as data, not
+  instructions. A declined request gets a reply with those resources. Requests opt into
+  server-side fallbacks, so a safety-classifier decline is retried on Anthropic's recommended model.
+- **Privacy and cost.** Conversations are private to the member, who can delete any of them;
+  admins see only counts (members, messages, reply tokens) on the analytics page. Only the text of
+  each turn is stored. Members can send 40 messages a day, up to 2,000 characters each; the last
+  24 messages of a conversation are sent with each turn. The instructions are prompt-cached.
+- **Formatting.** Replies use a little Markdown, rendered as React elements (`format.ts`), never
+  as HTML; links are kept only to pages on this site.
 
 ## Lesson downloads
 
@@ -539,6 +571,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

@@ -9,6 +9,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import {
   certificates,
+  coachMessages,
   comments,
   contentReports,
   courseModules,
@@ -367,6 +368,20 @@ export async function learning(db: Database, range: Range) {
   };
 }
 
+/** Coach use in the range: counts only, never content (conversations are private). */
+export async function coachUsage(db: Database, range: Range) {
+  const [row] = await db
+    .select({
+      members: sql<number>`count(distinct ${coachMessages.userId}) filter (where ${coachMessages.role} = 'user')::int`,
+      messages: sql<number>`(count(*) filter (where ${coachMessages.role} = 'user'))::int`,
+      conversations: sql<number>`count(distinct ${coachMessages.conversationId})::int`,
+      outputTokens: sql<number>`coalesce(sum(${coachMessages.outputTokens}), 0)::bigint`,
+    })
+    .from(coachMessages)
+    .where(and(gte(coachMessages.createdAt, range.start), lt(coachMessages.createdAt, range.end)));
+  return { members: row?.members ?? 0, messages: row?.messages ?? 0, conversations: row?.conversations ?? 0, outputTokens: Number(row?.outputTokens ?? 0) };
+}
+
 // ---------------------------------------------------------------------------
 // Community and creators
 // ---------------------------------------------------------------------------
@@ -400,7 +415,7 @@ export async function community(db: Database, range: Range) {
 
 /** Everything on the analytics page, for one range. */
 export async function analyticsOverview(db: Database, range: Range) {
-  const [members, money, joined, watched, top, courseRows, learned, social] = await Promise.all([
+  const [members, money, joined, watched, top, courseRows, learned, social, coach] = await Promise.all([
     membership(db, range),
     revenue(db, range),
     signups(db, range),
@@ -409,6 +424,7 @@ export async function analyticsOverview(db: Database, range: Range) {
     courseActivity(db, range),
     learning(db, range),
     community(db, range),
+    coachUsage(db, range),
   ]);
-  return { range, members, money, joined, watched, top, courses: courseRows, learned, social };
+  return { range, members, money, joined, watched, top, courses: courseRows, learned, social, coach };
 }

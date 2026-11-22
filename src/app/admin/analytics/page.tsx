@@ -34,7 +34,7 @@ function Section({ id, title, description, children }: { id: string; title: stri
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const days = parseRange((await searchParams).range);
   const range = rangeEndingAt(new Date(), days);
-  const { members, money, joined, watched, top, courses, learned, social } = await analyticsOverview(getDb(), range);
+  const { members, money, joined, watched, top, courses, learned, social, coach } = await analyticsOverview(getDb(), range);
   const period = `previous ${days} days`;
   const daily = <T extends { day: string; value: number }>(rows: T[]) =>
     rows.map((r) => ({ key: r.day, label: dayLabel(r.day), longLabel: dayLabel(r.day, "long"), value: r.value }));
@@ -249,6 +249,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             <p className="mt-3 text-xs text-muted">Learners: signed-in people who watched any of the course&apos;s lessons in this range.</p>
           </Card>
         )}
+      </Section>
+
+      <Section id="coach" title="Coach" description="Counts only: conversations with the coach are private, and nobody here can read them.">
+        <section aria-label="Coach numbers" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Kpi label="Members using the coach" value={coach.members.toLocaleString("en-US")} detail={members.active ? `${Math.round((coach.members / members.active) * 100)}% of members` : undefined} />
+          <Kpi label="Messages sent" value={coach.messages.toLocaleString("en-US")} detail={coach.members ? `${(coach.messages / coach.members).toFixed(1)} per member` : undefined} />
+          <Kpi label="Conversations" value={coach.conversations.toLocaleString("en-US")} />
+          <Kpi label="Reply tokens" value={formatCount(coach.outputTokens)} detail="Output tokens, the main driver of cost" />
+        </section>
       </Section>
 
       <Section id="community" title="Community">

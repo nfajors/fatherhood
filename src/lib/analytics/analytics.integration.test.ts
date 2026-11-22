@@ -9,7 +9,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { community, courseActivity, learning, membership, parseRange, rangeDays, rangeEndingAt, revenue, signups, topVideos, viewing } from "./service";
+import { coachUsage, community, courseActivity, learning, membership, parseRange, rangeDays, rangeEndingAt, revenue, signups, topVideos, viewing } from "./service";
 
 const url = process.env.TEST_DATABASE_URL;
 const NOW = new Date("2026-11-21T15:00:00Z");
@@ -47,7 +47,7 @@ describe.skipIf(!url)("analytics (Postgres)", () => {
 
   beforeEach(async () => {
     await db.execute(
-      sql`truncate subscriptions, revenue_ledger, watch_sessions, ratings, comments, certificates, quiz_attempts, quizzes, lessons, course_modules, courses, content_reports, creator_applications, videos, "user" cascade`,
+      sql`truncate coach_conversations, subscriptions, revenue_ledger, watch_sessions, ratings, comments, certificates, quiz_attempts, quizzes, lessons, course_modules, courses, content_reports, creator_applications, videos, "user" cascade`,
     );
   });
 
@@ -180,6 +180,25 @@ describe.skipIf(!url)("analytics (Postgres)", () => {
       { id: course!.id, title: "Presence", slug: "presence", learners: 1, certificates: 1, certificatesAllTime: 1 },
     ]);
     expect(await learning(db, range)).toEqual({ quizAttempts: 2, quizPassRate: 0.5, certificates: { current: 1, previous: 0 } });
+  });
+
+  it("counts coach use without reading it", async () => {
+    await person("a", daysAgo(30));
+    await person("b", daysAgo(30));
+    const [c1, c2, old] = await db
+      .insert(schema.coachConversations)
+      .values([{ userId: "a", title: "x" }, { userId: "b", title: "y" }, { userId: "b", title: "z" }])
+      .returning();
+    const msg = (conversationId: string, userId: string, role: "user" | "assistant", createdAt: Date, outputTokens?: number) => ({ conversationId, userId, role, content: "private", createdAt, outputTokens });
+    await db.insert(schema.coachMessages).values([
+      msg(c1!.id, "a", "user", daysAgo(1)),
+      msg(c1!.id, "a", "assistant", daysAgo(1), 300),
+      msg(c1!.id, "a", "user", daysAgo(1)),
+      msg(c2!.id, "b", "user", daysAgo(2)),
+      msg(c2!.id, "b", "assistant", daysAgo(2), 200),
+      msg(old!.id, "b", "user", daysAgo(20)),
+    ]);
+    expect(await coachUsage(db, range)).toEqual({ members: 2, messages: 3, conversations: 2, outputTokens: 500 });
   });
 
   it("counts community activity and what's waiting on admins", async () => {

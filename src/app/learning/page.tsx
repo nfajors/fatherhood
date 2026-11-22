@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 import { CourseCardView, ProgressBar } from "@/components/catalog/cards";
 import { RecommendedSection } from "@/components/discovery/recommended";
 import { Button } from "@/components/ui/button";
+import { PathSteps } from "@/components/coach/path-card";
+import { Card } from "@/components/ui/card";
 import { getSessionUser } from "@/lib/auth";
+import { canUseCoach, coachConfigured } from "@/lib/coach/access";
+import { getPath } from "@/lib/coach/path";
 import { continueWatching, coursesInProgress } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
 import { recommendFor } from "@/lib/discovery/recommend";
@@ -18,17 +22,41 @@ export default async function LearningPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/sign-in?next=/learning");
   const db = getDb();
-  const [watching, courses, recs, certificates] = await Promise.all([
+  const [watching, courses, recs, certificates, coach] = await Promise.all([
     continueWatching(db, sessionUser.id),
     coursesInProgress(db, sessionUser.id),
     recommendFor(db, sessionUser.id, { videos: 6, courses: 3 }),
     certificatesFor(db, sessionUser.id),
+    (async () => (coachConfigured() && (await canUseCoach(db, sessionUser)) ? { path: await getPath(db, sessionUser.id) } : null))(),
   ]);
   const empty = watching.length === 0 && courses.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <h1 className="text-4xl font-semibold">My Learning</h1>
+
+      {coach && (
+        <Card className="mt-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <h2 className="text-2xl font-semibold">Your path</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href="/coach">Talk to your coach</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/coach/plan">{coach.path ? "Update your plan" : "Get a plan"}</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="mt-3">
+            {coach.path ? (
+              <PathSteps path={coach.path} compact />
+            ) : (
+              <p className="max-w-2xl text-muted">Tell the coach where you are and what you want to work on, and it plans a path of lessons and stories for you.</p>
+            )}
+          </div>
+        </Card>
+      )}
 
       {empty && (
         <div className="mt-8 max-w-xl">
