@@ -120,7 +120,8 @@ export const verification = pgTable("verification", {
 // Membership
 // ---------------------------------------------------------------------------
 
-export const subscriptionPlan = pgEnum("subscription_plan", ["monthly", "annual", "gift"]);
+/** organization: a seat licensed to an organization (lib/organizations), no Stripe subscription. */
+export const subscriptionPlan = pgEnum("subscription_plan", ["monthly", "annual", "gift", "organization"]);
 
 /** Mirrors Stripe's subscription statuses; gift access uses "active". */
 export const subscriptionStatus = pgEnum("subscription_status", [
@@ -150,6 +151,10 @@ export const subscriptions = pgTable(
     stripePriceId: text("stripe_price_id"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    /** For plan "organization": the seat this access comes from. */
+    organizationMemberId: uuid("organization_member_id")
+      .unique()
+      .references((): AnyPgColumn => organizationMembers.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("subscriptions_user_id_idx").on(t.userId)],
@@ -682,7 +687,7 @@ export const creatorPayoutAccounts = pgTable("creator_payout_accounts", {
 // Revenue share (policy in lib/revenue/policy.ts)
 // ---------------------------------------------------------------------------
 
-export const revenueKind = pgEnum("revenue_kind", ["subscription_invoice", "gift"]);
+export const revenueKind = pgEnum("revenue_kind", ["subscription_invoice", "gift", "organization"]);
 
 /** Paid subscription revenue, recorded from Stripe; the base for the creator pool. */
 export const revenueLedger = pgTable(
@@ -1071,3 +1076,108 @@ export const learningPaths = pgTable("learning_paths", {
   model: text("model").notNull(),
   ...timestamps,
 });
+
+// ---------------------------------------------------------------------------
+// Organizations (lib/organizations): seat licenses sold on contract
+// ---------------------------------------------------------------------------
+
+export const organizationKind = pgEnum("organization_kind", [
+  "nonprofit",
+  "employer",
+  "university",
+  "military",
+  "government",
+  "faith",
+  "healthcare",
+  "other",
+]);
+export type OrganizationKind = (typeof organizationKind.enumValues)[number];
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  kind: organizationKind("kind").notNull(),
+  /** Who receives invoices. */
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email").notNull(),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  /** Shared code fathers can join with (e.g. handed out in a class), when enabled. */
+  joinCode: text("join_code").unique(),
+  joinCodeEnabled: boolean("join_code_enabled").notNull().default(false),
+  ...timestamps,
+});
+
+/**
+ * draft: being set up, grants nothing; invoiced: sent (access runs from startsAt while it's
+ * awaiting payment); paid; void: cancelled before payment, grants nothing.
+ */
+export const contractStatus = pgEnum("contract_status", ["draft", "invoiced", "paid", "void"]);
+export type ContractStatus = (typeof contractStatus.enumValues)[number];
+
+export const organizationContracts = pgTable(
+  "organization_contracts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "restrict" }),
+    seats: integer("seats").notNull(),
+    pricePerSeatCents: integer("price_per_seat_cents").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    daysUntilDue: smallint("days_until_due").notNull().default(30),
+    status: contractStatus("status").notNull().default("draft"),
+    stripeInvoiceId: text("stripe_invoice_id").unique(),
+    invoiceUrl: text("invoice_url"),
+    invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Set when paid outside Stripe (check, wire): how. */
+    paymentNote: text("payment_note"),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    notes: text("notes"),
+    createdById: text("created_by_id").references(() => user.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    index("organization_contracts_org_idx").on(t.organizationId, t.startsAt),
+    check("organization_contracts_dates", sql`${t.endsAt} > ${t.startsAt}`),
+    check("organization_contracts_seats", sql`${t.seats} > 0`),
+  ],
+);
+
+export const organizationMemberStatus = pgEnum("organization_member_status", ["invited", "active", "removed"]);
+
+/**
+ * A father with a seat, or a manager who runs the organization's account (managers use no
+ * seat). Invitations are rows with status "invited" and a hashed one-time token.
+ */
+export const organizationMembers = pgTable(
+  "organization_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    /** Lowercased; the invited address, or the account's address for a join code. */
+    email: text("email").notNull(),
+    isManager: boolean("is_manager").notNull().default(false),
+    status: organizationMemberStatus("status").notNull().default("invited"),
+    /** sha256 of the invitation token; cleared once used. */
+    inviteTokenHash: text("invite_token_hash").unique(),
+    inviteExpiresAt: timestamp("invite_expires_at", { withTimezone: true }),
+    invitedById: text("invited_by_id").references(() => user.id, { onDelete: "set null" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true }),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    /** The father agreed to share his name and progress with the organization's managers. */
+    shareProgress: boolean("share_progress").notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("organization_members_email_idx").on(t.organizationId, t.email, t.isManager).where(sql`${t.status} <> 'removed'`),
+    uniqueIndex("organization_members_user_idx").on(t.organizationId, t.userId, t.isManager).where(sql`${t.status} <> 'removed' and ${t.userId} is not null`),
+    index("organization_members_user_id_idx").on(t.userId),
+  ],
+);

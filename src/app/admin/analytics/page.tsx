@@ -97,15 +97,16 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                   { label: "Monthly", value: members.plans.monthly },
                   { label: "Annual", value: members.plans.annual },
                   { label: "Gift", value: members.plans.gift },
+                  { label: "Organization", value: members.plans.organization },
                 ]}
               />
             </div>
-            <p className="mt-4 text-xs text-muted">Monthly recurring revenue counts annual plans at a twelfth of $199. Gifts are paid up front, so they aren&apos;t in it.</p>
+            <p className="mt-4 text-xs text-muted">Monthly recurring revenue counts annual plans at a twelfth of $199. Gifts and organization seats are paid up front, so they aren&apos;t in it.</p>
           </Card>
         </div>
       </Section>
 
-      <Section id="revenue" title="Revenue" description="Paid membership invoices and gift purchases, as recorded from Stripe (before Stripe's fees and any later refunds).">
+      <Section id="revenue" title="Revenue" description="Paid membership invoices, gift purchases and organization contracts, as recorded from Stripe (before Stripe's fees and any later refunds).">
         <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
           <Card>
             <h3 className="text-lg font-semibold">Revenue by month</h3>
@@ -120,6 +121,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </Card>
           <div className="grid content-start gap-4">
             <Kpi label={`Gifts, last ${days} days`} value={dollars(money.giftCents)} detail="Included in revenue" />
+            <Kpi label={`Organizations, last ${days} days`} value={dollars(money.organizationCents)} detail="Contract invoices paid; included in revenue" />
             <Kpi label="To the creator pool" value={dollars(money.creatorPoolCents)} detail={`${REVENUE_POLICY.poolShareBps / 100}% of the last ${days} days' revenue`} />
           </div>
         </div>

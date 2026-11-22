@@ -15,7 +15,8 @@ describe("dueJobs", () => {
     expect(at("2026-11-21T10:46:10Z")).toEqual(["email-sequences"]);
   });
 
-  it("runs payouts daily and settlement early in the month", () => {
+  it("runs payouts and organization access daily, and settlement early in the month", () => {
+    expect(at("2026-11-21T06:00:00Z")).toContain("organizations");
     expect(at("2026-11-21T16:00:00Z")).toContain("payouts");
     expect(at("2026-11-21T16:05:00Z")).not.toContain("payouts");
     expect(at("2026-12-02T12:00:00Z")).toContain("revenue-settlement");
@@ -26,7 +27,7 @@ describe("dueJobs", () => {
 
   it("covers every cron endpoint", () => {
     expect(JOBS.map((j) => j.path).sort()).toEqual(
-      ["/api/cron/email-sequences", "/api/cron/gift-delivery", "/api/cron/moderation", "/api/cron/payouts", "/api/cron/revenue-settlement"].sort(),
+      ["/api/cron/email-sequences", "/api/cron/gift-delivery", "/api/cron/moderation", "/api/cron/organizations", "/api/cron/payouts", "/api/cron/revenue-settlement"].sort(),
     );
   });
 });

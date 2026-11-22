@@ -16,6 +16,8 @@ export const JOBS = [
   { name: "gift-delivery", path: "/api/cron/gift-delivery", due: ({ minute }) => minute === 0 },
   // Creator payout reminders and (with PAYOUTS_AUTO_SEND) sending, daily at 16:00.
   { name: "payouts", path: "/api/cron/payouts", due: ({ minute, hour }) => hour === 16 && minute === 0 },
+  // Organization seats: start access for contracts beginning today and follow renewals, daily at 06:00.
+  { name: "organizations", path: "/api/cron/organizations", due: ({ minute, hour }) => hour === 6 && minute === 0 },
   // Last month's creator pool, at 12:00 on the 2nd; the 3rd and 4th catch a missed run (settling twice returns the stored result).
   { name: "revenue-settlement", path: "/api/cron/revenue-settlement", due: ({ minute, hour, day }) => day >= 2 && day <= 4 && hour === 12 && minute === 0 },
 ];

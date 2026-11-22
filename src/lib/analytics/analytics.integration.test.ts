@@ -73,7 +73,7 @@ describe.skipIf(!url)("analytics (Postgres)", () => {
 
     const m = await membership(db, range);
     expect(m.active).toBe(3);
-    expect(m.plans).toEqual({ monthly: 1, annual: 1, gift: 1 });
+    expect(m.plans).toEqual({ monthly: 1, annual: 1, gift: 1, organization: 0 });
     expect(m.mrrCents).toBe(1900 + Math.round(19900 / 12));
     expect({ renewing: m.renewing, cancelling: m.cancelling }).toEqual({ renewing: 1, cancelling: 1 });
     expect(m.started).toEqual({ current: 1, previous: 0 });

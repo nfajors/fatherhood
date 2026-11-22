@@ -6,6 +6,8 @@ import { processedWebhookEvents, revenueLedger, subscriptions, user } from "@/li
 import { stripeEnv } from "@/lib/env";
 import { recordGiftPayment, sendGiftEmails, stripeCredits } from "@/lib/gifts/runtime";
 import { refundGiftPayment } from "@/lib/gifts/service";
+import { recordContractPaid, recordInvoiceVoided } from "@/lib/organizations/service";
+import { contractIdFromInvoice } from "@/lib/organizations/runtime";
 import { recordTransferReversal } from "@/lib/payouts/service";
 import { getStripe, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
 
@@ -20,8 +22,8 @@ const SUBSCRIPTION_EVENTS = new Set([
 /**
  * Stripe webhook: keeps `subscriptions` in sync, which is what grants access,
  * records paid subscription invoices in the revenue ledger that funds the
- * creator pool, fulfils and refunds gift memberships, and notices creator payout
- * transfers reversed in Stripe. Each event id is
+ * creator pool, fulfils and refunds gift memberships, records organization contract
+ * invoices as paid or voided, and notices creator payout transfers reversed in Stripe. Each event id is
  * recorded so Stripe's retries are processed once.
  */
 export async function POST(request: Request) {
@@ -52,6 +54,23 @@ export async function POST(request: Request) {
       await refundGiftPayment(getDb(), { paymentIntentId, fullyRefunded: charge.refunded }, stripeCredits);
     }
     return NextResponse.json({ received: true });
+  }
+
+  // Organization contract invoices: idempotent on their own, like gifts.
+  if (event.type === "invoice.paid" || event.type === "invoice.voided") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const contractId = contractIdFromInvoice(invoice);
+    if (contractId) {
+      if (event.type === "invoice.paid") {
+        const paidAt = new Date((invoice.status_transitions?.paid_at ?? event.created) * 1000);
+        // A check or wire marked paid in Stripe ("paid out of band") can report nothing in amount_paid.
+        const amountPaidCents = invoice.amount_paid > 0 ? invoice.amount_paid : invoice.total;
+        await recordContractPaid(getDb(), { contractId, stripeInvoiceId: invoice.id!, amountPaidCents, paidAt });
+      } else {
+        await recordInvoiceVoided(getDb(), invoice.id!);
+      }
+      return NextResponse.json({ received: true });
+    }
   }
 
   if (event.type === "transfer.reversed") {
