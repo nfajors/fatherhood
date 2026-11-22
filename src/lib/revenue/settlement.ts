@@ -1,7 +1,7 @@
 /**
  * Monthly creator-pool settlement: loads the period's revenue and engagement,
  * applies the Winning pool policy (pool.ts) and records shares and payouts.
- * Payout records start as "pending"; sending money (Stripe Connect) is a later step.
+ * Payout records start as "pending"; lib/payouts sends them through Stripe Connect.
  */
 import { and, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db";

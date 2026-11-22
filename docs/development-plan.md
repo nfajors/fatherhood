@@ -331,11 +331,18 @@ real engagement data exists.
 - Enhanced community (comments, better discovery).
 - Certificates, quizzes.
 - Mobile-responsive excellence + PWA.
+  *Built November 21, 2026:* web app manifest and icons, a service worker with an offline page
+  (pages never cached), an install button, a phone/tablet menu, and a 390px check of every page.
 - Email sequences, recommendations.
   *Built October 18, 2026:* welcome, new-member, come-back and win-back sequences written from
   each person's progress, reply notifications, email settings with one-click unsubscribe.
 - Automated payouts (Stripe Connect).
+  *Built November 21, 2026:* Express onboarding from the Studio, monthly settlement and daily
+  transfers on a schedule (with a 3-day hold and an admin switch), retries that never pay twice,
+  setup reminders, and an admin payouts page.
 - Analytics dashboards.
+  *Built November 21, 2026:* `/admin/analytics` with membership (members over time, MRR, churn),
+  revenue, sign-ups and conversion, viewing, learning and community figures over 7/30/90 days.
 
 **Phase 3 – Scale (Year 2+)**
 - Native mobile apps (offline).
