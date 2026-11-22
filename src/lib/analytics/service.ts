@@ -101,8 +101,8 @@ export async function membership(db: Database, range: Range) {
   const [mrr] = await db
     .select({
       cents: sql<number>`coalesce(sum(case ${subscriptions.plan} when 'monthly' then ${PLANS.monthly.amountCents} when 'annual' then ${PLANS.annual.amountCents} / 12.0 else 0 end), 0)::int`,
-      renewing: sql<number>`count(*) filter (where not ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} <> 'gift')::int`,
-      cancelling: sql<number>`count(*) filter (where ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} <> 'gift')::int`,
+      renewing: sql<number>`count(*) filter (where not ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} in ('monthly', 'annual'))::int`,
+      cancelling: sql<number>`count(*) filter (where ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} in ('monthly', 'annual'))::int`,
     })
     .from(subscriptions)
     .where(and(inArray(subscriptions.status, ["active", "past_due"]), sql`${subscriptions.currentPeriodEnd} > ${iso(now)}`));
@@ -142,11 +142,11 @@ export async function membership(db: Database, range: Range) {
            else least(s.current_period_end, s.updated_at) end) > least(d + interval '1 day', ${now.toISOString()}::timestamptz)
     group by d order by d`);
 
-  const byPlan = Object.fromEntries(current.map((r) => [r.plan, r.members])) as Partial<Record<"monthly" | "annual" | "gift", number>>;
+  const byPlan = Object.fromEntries(current.map((r) => [r.plan, r.members])) as Partial<Record<"monthly" | "annual" | "gift" | "organization", number>>;
   return {
     active: active?.n ?? 0,
     activeAtStart: atStart,
-    plans: { monthly: byPlan.monthly ?? 0, annual: byPlan.annual ?? 0, gift: byPlan.gift ?? 0 },
+    plans: { monthly: byPlan.monthly ?? 0, annual: byPlan.annual ?? 0, gift: byPlan.gift ?? 0, organization: byPlan.organization ?? 0 },
     mrrCents: mrr?.cents ?? 0,
     renewing: mrr?.renewing ?? 0,
     cancelling: mrr?.cancelling ?? 0,
@@ -169,6 +169,7 @@ export async function revenue(db: Database, range: Range) {
       .select({
         cents: sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)::int`,
         gifts: sql<number>`coalesce(sum(${revenueLedger.amountCents}) filter (where ${revenueLedger.kind} = 'gift'), 0)::int`,
+        organizations: sql<number>`coalesce(sum(${revenueLedger.amountCents}) filter (where ${revenueLedger.kind} = 'organization'), 0)::int`,
       })
       .from(revenueLedger)
       .where(and(gte(revenueLedger.occurredAt, from), lt(revenueLedger.occurredAt, to)));
@@ -199,6 +200,7 @@ export async function revenue(db: Database, range: Range) {
   return {
     totalCents: { current: cents, previous: previous?.cents ?? 0 } satisfies Compared,
     giftCents: current?.gifts ?? 0,
+    organizationCents: current?.organizations ?? 0,
     /** What this range adds to the creator pool. */
     creatorPoolCents: Math.floor((cents * REVENUE_POLICY.poolShareBps) / 10_000),
     monthly,

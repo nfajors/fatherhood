@@ -52,7 +52,8 @@ marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
 `BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
 **Scheduled jobs.** Set `CRON_SECRET`. Five jobs run on a schedule (`scripts/jobs.mjs`, all UTC):
-moderation every 10 minutes, email sequences every 15, gift delivery hourly, payouts daily at 16:00
+moderation every 10 minutes, email sequences every 15, gift delivery hourly, organization access daily at
+06:00, payouts daily at 16:00
 and last month's revenue settlement at 12:00 on the 2nd (the 3rd and 4th catch a missed run).
 `scripts/cron-tick.mjs`, run every 5 minutes, calls whichever are due on the web service with
 `Authorization: Bearer $CRON_SECRET`; `npm run cron:tick -- payouts` runs one now. Every job is
@@ -70,7 +71,7 @@ Paid access is not a role: it is derived from the `subscriptions` table.
    `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL`.
 2. Add a webhook endpoint at `/api/stripe/webhook` for `checkout.session.completed`,
    `checkout.session.async_payment_succeeded`, `customer.subscription.*`, `invoice.paid`,
-   `charge.refunded` and `transfer.reversed`, then set `STRIPE_WEBHOOK_SECRET`.
+   `charge.refunded`, `invoice.voided` and `transfer.reversed`, then set `STRIPE_WEBHOOK_SECRET`.
    Locally: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 3. Turn on the customer portal (members manage billing from `/account`).
 
@@ -122,6 +123,7 @@ src/
     api/stripe/portal       Stripe customer portal
     manifest.ts, offline/   installable app and the page shown without a connection
     coach/, api/coach/...   the AI coach: conversations (streamed), profile, learning path
+    admin/organizations, org/[slug], join/  organization licenses: contracts, managers' page, joining
     admin/analytics         membership, revenue, viewing and learning figures
     api/stripe/webhook      sync subscriptions (idempotent)
     api/stripe/connect-webhook  creators' payout account status (Stripe Connect)
@@ -297,6 +299,35 @@ coach pages say it isn't available. Non-members see what it does and a link to m
   24 messages of a conversation are sent with each turn. The instructions are prompt-cached.
 - **Formatting.** Replies use a little Markdown, rendered as React elements (`format.ts`), never
   as HTML; links are kept only to pages on this site.
+
+## Organizations (Phase 3)
+
+`src/lib/organizations/`. Seat licenses sold on contract to fatherhood programs, employers,
+universities, the military, courts and faith communities (`/for-organizations` explains the offer).
+
+- **Contracts** (`/admin/organizations`). Our team adds the organization and its billing email, then a
+  contract: seats, first and last day, price per seat (set per contract) and payment terms. "Send
+  invoice" creates, finalizes and emails a Stripe invoice (card or bank transfer). Access starts on the
+  first day while the invoice awaits payment; `invoice.paid` marks it paid, and `invoice.voided` (or
+  "Void" here) ends it. A check or wire against a Stripe invoice is marked paid in Stripe ("paid out of
+  band"); "Paid without an invoice" records a contract paid outside Stripe, or a free pilot. Renewals
+  are a new contract starting the day after the current one ends (access carries straight on); extra
+  seats mid-term are a contract for those seats over the same dates.
+- **Seats and access.** A father's seat is an ordinary membership row (plan `organization`), kept in
+  step with the contracts, so the Academy, the coach, email sequences and analytics treat him as a
+  member. Managers use no seat. The daily job (`/api/cron/organizations`) starts access for contracts
+  beginning that day. Removing a father, or his leaving, frees the seat; his own account and progress stay.
+- **Joining.** Managers (and our team) invite by email: paste a list, one link each, valid 30 days.
+  Or they turn on a join code (`ORG-XXXX-XXXX`) to hand out in a class; fathers enter it at `/join`.
+  Joining needs an account, and is refused when every seat is taken.
+- **Privacy.** When he joins, each father chooses whether the organization sees his name and progress,
+  and can change it on his account page. Managers (`/org/{slug}`) always see seats used; progress totals
+  (active in 30 days, lessons, certificates, time watched) leave out the fathers who keep theirs private
+  when there are fewer than 5 of them, so they can't be worked out by subtraction. Sharing fathers are
+  listed with their progress and can be exported as CSV (formula-safe). Coach conversations are never shared.
+- **Revenue.** Paid contracts go into the revenue ledger (`organization`), so 25% funds the creator
+  pool like memberships; the whole contract counts in the month it's paid.
+- **Setup.** Add `invoice.voided` to the main Stripe webhook's events (`invoice.paid` is already there).
 
 ## Lesson downloads
 
@@ -571,6 +602,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths. Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, and organization licensing. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

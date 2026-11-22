@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmailSettingsForm } from "@/components/email/email-settings";
 import { ManageBillingButton } from "@/components/manage-billing-button";
+import { SharingControls } from "@/components/organizations/forms";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionUser } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { subscriptions } from "@/lib/db/schema";
 import { CATEGORY_LABELS } from "@/lib/emails/policy";
 import { getPreferences } from "@/lib/emails/preferences";
 import { hasActiveMembership } from "@/lib/entitlements";
+import { membershipsFor } from "@/lib/organizations/service";
 
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
@@ -21,7 +23,7 @@ export default async function AccountPage() {
   if (!sessionUser) redirect("/sign-in?next=/account");
 
   const db = getDb();
-  const prefs = await getPreferences(db, sessionUser.id);
+  const [prefs, orgs] = await Promise.all([getPreferences(db, sessionUser.id), membershipsFor(db, sessionUser.id)]);
   const rows = await db
     .select()
     .from(subscriptions)
@@ -37,7 +39,7 @@ export default async function AccountPage() {
         <CardTitle>Membership</CardTitle>
         {active && current ? (
           <CardDescription>
-            {current.plan === "annual" ? "Annual" : current.plan === "monthly" ? "Monthly" : "Gift"} membership,{" "}
+            {{ annual: "Annual", monthly: "Monthly", gift: "Gift", organization: "Organization" }[current.plan]} membership,{" "}
             {current.cancelAtPeriodEnd ? "ends" : "renews"} {current.currentPeriodEnd.toLocaleDateString("en-US", { dateStyle: "long" })}.
           </CardDescription>
         ) : (
@@ -52,6 +54,37 @@ export default async function AccountPage() {
           {sessionUser.stripeCustomerId ? <ManageBillingButton /> : null}
         </div>
       </Card>
+      {orgs.length > 0 && (
+        <Card className="mt-6" id="organizations">
+          <CardTitle>Organizations</CardTitle>
+          <ul className="mt-4 space-y-5">
+            {orgs.map((o) => (
+              <li key={o.id}>
+                <p className="font-semibold">{o.orgName}</p>
+                {o.isManager ? (
+                  <p className="mt-1 text-sm">
+                    You manage this organization.{" "}
+                    <Link href={`/org/${o.orgSlug}`} className="font-semibold underline-offset-2 hover:underline">
+                      Open its page →
+                    </Link>
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm text-muted">
+                      {o.accessStatus === "active" && o.accessUntil && o.accessUntil > new Date()
+                        ? `Your access through ${o.orgName} runs until ${new Date(o.accessUntil.getTime() - 1).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "UTC" })}.`
+                        : `Your access through ${o.orgName} isn't active right now.`}
+                    </p>
+                    <div className="mt-2">
+                      <SharingControls memberId={o.id} organization={o.orgName} shares={o.shareProgress} />
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <Card className="mt-6" id="email">
         <CardTitle>Email</CardTitle>
         <CardDescription className="mb-5">Sent to {sessionUser.email}.</CardDescription>

@@ -92,6 +92,13 @@
       "when": 1795315523779,
       "tag": "0012_ai_coach",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795364570613,
+      "tag": "0013_organizations",
+      "breakpoints": true
     }
   ]
 }

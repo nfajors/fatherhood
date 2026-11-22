@@ -350,6 +350,9 @@ real engagement data exists.
 - Native mobile apps (offline).
 - Full social features.
 - B2B licensing portal.
+  *Built November 22, 2026:* sales-led seat licenses (contracts priced per organization, Stripe
+  invoices), email invitations and join codes, a managers' page with consent-based reporting and
+  small-group privacy, and contract revenue in the creator pool.
 - Advanced AI (personalized paths, AI coaching companion).
   *Built November 22, 2026:* the Coach at `/coach` for members: streaming conversations grounded
   in the library (search and read tools) and each father's progress, a personalized learning path

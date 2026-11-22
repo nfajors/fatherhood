@@ -17,6 +17,7 @@ export function SiteFooter() {
           <Link href="/community">Community Voices</Link>
           <Link href="/collections">Collections</Link>
           <Link href="/fellows">Become a Fellow</Link>
+          <Link href="/for-organizations">For organizations</Link>
           <InstallAppButton className="font-semibold text-navy-900 underline-offset-2 hover:underline" />
         </nav>
       </div>

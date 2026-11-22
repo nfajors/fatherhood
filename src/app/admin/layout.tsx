@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/creators", label: "Fellows" },
   { href: "/admin/payouts", label: "Payouts" },
+  { href: "/admin/organizations", label: "Organizations" },
   { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/comments", label: "Comments" },
   { href: "/admin/collections", label: "Collections" },
