@@ -279,6 +279,8 @@ real engagement data exists.
   - Recommendations: simple collaborative filtering or LLM-based later
 - **Email:** Resend
 - **Deployment:** Cloudflare Pages + Workers, or Vercel + Cloudflare Stream
+  *Decided November 22, 2026:* Railway (web service, scheduler service, Postgres) with Cloudflare
+  Stream and R2. See "Deploying on Railway" in the README.
 
 ### 5.2 Key Data Models (High-Level)
 - Users (roles: free, subscriber, creator, admin)

@@ -6,7 +6,6 @@ import { getScreener, streamMedia } from "@/lib/moderation/runtime";
 import { screenPendingVideos } from "@/lib/moderation/service";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
 
 /** Finish AI screens for queued videos whose captions are ready. Run every 10 minutes. */
 export async function GET(request: Request) {

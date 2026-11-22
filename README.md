@@ -27,7 +27,9 @@ npm run dev                  # http://localhost:3000
 | `npm test` / `test:coverage` | Unit tests (Vitest); set `TEST_DATABASE_URL` to a disposable database to also run the Postgres integration tests |
 | `npm run typecheck` / `lint` | TypeScript and ESLint |
 | `npm run db:generate` | Generate a migration after editing `src/lib/db/schema.ts` |
-| `npm run db:migrate` | Apply migrations |
+| `npm run db:migrate` | Apply migrations (drizzle-kit) |
+| `npm run db:migrate:deploy` | Apply migrations with runtime dependencies only (Railway's pre-deploy step) |
+| `npm run cron:tick` | Run the scheduled jobs due now, or name some: `npm run cron:tick -- payouts` |
 | `npm run themes:seed` | Add or update the starting themes from the book (never overwrites admin edits) |
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run gifts:deliver` | Send scheduled gift emails that are due, and retry failed sends |
@@ -48,13 +50,14 @@ sequence emails for real, set `EMAIL_POSTAL_ADDRESS` (US law requires a postal a
 marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
 `BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
-**Scheduled jobs.** Set `CRON_SECRET`. On Vercel, `vercel.json` runs `/api/cron/gift-delivery`
-hourly, `/api/cron/moderation` every 10 minutes, `/api/cron/email-sequences` every 15 minutes,
-`/api/cron/payouts` daily and `/api/cron/revenue-settlement` on the 2nd of each month
-(sub-daily crons need a paid Vercel plan). On other hosts, call them with
-`Authorization: Bearer $CRON_SECRET` on the same schedule.
+**Scheduled jobs.** Set `CRON_SECRET`. Five jobs run on a schedule (`scripts/jobs.mjs`, all UTC):
+moderation every 10 minutes, email sequences every 15, gift delivery hourly, payouts daily at 16:00
+and last month's revenue settlement at 12:00 on the 2nd (the 3rd and 4th catch a missed run).
+`scripts/cron-tick.mjs`, run every 5 minutes, calls whichever are due on the web service with
+`Authorization: Bearer $CRON_SECRET`; `npm run cron:tick -- payouts` runs one now. Every job is
+safe to run twice.
 
-**Postgres.** Any Postgres 15+ (Neon or Supabase in production). Set `DATABASE_URL`.
+**Postgres.** Any Postgres 15+ (Railway's Postgres in production). Set `DATABASE_URL`.
 
 **Better Auth.** Set `BETTER_AUTH_SECRET` (`openssl rand -base64 32`) and `BETTER_AUTH_URL`.
 Google sign-in turns on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set.
@@ -81,6 +84,32 @@ Paid access is not a role: it is derived from the `subscriptions` table.
 4. Optional: create a watermark profile from the logo PNG
    (`StreamClient.createWatermarkProfile`) and set `CLOUDFLARE_STREAM_WATERMARK_UID`;
    it is then burned into every upload.
+
+## Deploying on Railway
+
+The repository is set up for [Railway](https://railway.com): `railway.json` for the web service and
+`railway.cron.json` for the scheduler. Two services and a database, in one Railway project:
+
+1. **Postgres.** Add a PostgreSQL database to the project.
+2. **Web service.** New service from this GitHub repository. It reads `railway.json`: builds with
+   `npm run build`, applies migrations before each deploy (`npm run db:migrate:deploy`, so a failed
+   migration stops the deploy and the old version keeps serving), starts with `npm run start` (Next
+   listens on the `PORT` Railway provides) and checks `/api/health`. Set its variables:
+   `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`, and everything in `.env.example`. Set
+   `NEXT_PUBLIC_APP_URL` and `BETTER_AUTH_URL` to the public URL (your domain once it's attached)
+   **before** the first build, because `NEXT_PUBLIC_*` values are baked into the build.
+3. **Scheduler service.** A second service from the same repository. In its settings, set the
+   config-as-code file path to `/railway.cron.json`. It skips the build and runs
+   `node scripts/cron-tick.mjs` every 5 minutes, then exits. Give it just two variables:
+   `CRON_SECRET` (the same as the web service; `${{web.CRON_SECRET}}` if the web service is
+   named `web`) and `CRON_TARGET_URL` (the web service's public URL, or its private one,
+   `http://${{web.RAILWAY_PRIVATE_DOMAIN}}:${{web.PORT}}`, if you set a fixed `PORT` on it).
+4. **Domain.** Attach `fatherhood.school` to the web service, then point the webhooks at it:
+   Stripe (`/api/stripe/webhook`, `/api/stripe/connect-webhook`) and Cloudflare Stream
+   (`/api/stream/webhook`), and add the domain to the R2 bucket's CORS rule.
+
+Settings in `railway.json` override the same settings in the Railway dashboard. Long jobs aren't cut
+off as on serverless hosts: the web service is an ordinary long-running Node server.
 
 ## How it fits together
 

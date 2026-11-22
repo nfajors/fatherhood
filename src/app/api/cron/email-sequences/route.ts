@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Enrolls people in email sequences and sends what's due.
- * Call every 15 minutes with `Authorization: Bearer $CRON_SECRET` (vercel.json does this on Vercel).
+ * Call every 15 minutes with `Authorization: Bearer $CRON_SECRET` (scripts/cron-tick.mjs does this).
  */
 export async function GET(request: Request) {
   if (!authorizedCron(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

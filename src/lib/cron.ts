@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-/** True when the request carries `Authorization: Bearer $CRON_SECRET` (Vercel Cron sends this). */
+/** True when the request carries `Authorization: Bearer $CRON_SECRET` (scripts/cron-tick.mjs sends this). */
 export function authorizedCron(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;

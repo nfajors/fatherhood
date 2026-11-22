@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Sends scheduled gift emails whose date has come, and retries failed sends.
- * Call hourly with `Authorization: Bearer $CRON_SECRET` (vercel.json does this on Vercel).
+ * Call hourly with `Authorization: Bearer $CRON_SECRET` (scripts/cron-tick.mjs does this).
  */
 export async function GET(request: Request) {
   if (!authorizedCron(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
