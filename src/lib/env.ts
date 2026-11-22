@@ -41,6 +41,15 @@ export function stripeEnv() {
   });
 }
 
+/**
+ * Stripe Tax: calculate and collect sales tax, VAT and GST at checkout. Turn it on
+ * (STRIPE_TAX_ENABLED=true) after setting up Stripe Tax in the dashboard (origin
+ * address and registrations), or Checkout will refuse to start.
+ */
+export function stripeTaxEnabled(): boolean {
+  return process.env.STRIPE_TAX_ENABLED === "true";
+}
+
 export function streamEnv() {
   return parse("Cloudflare Stream", {
     CLOUDFLARE_ACCOUNT_ID: required,

@@ -5,7 +5,9 @@ import { getSessionUser } from "@/lib/auth";
 import { MONEY_BACK_GUARANTEE_DAYS } from "@/lib/config";
 import { getDb } from "@/lib/db";
 import { user } from "@/lib/db/schema";
-import { appUrl } from "@/lib/env";
+import { appUrl, stripeTaxEnabled } from "@/lib/env";
+import { currentRegion } from "@/lib/region-server";
+import { isCurrency } from "@/lib/regions";
 import { getStripe, priceIdFor } from "@/lib/stripe";
 
 const body = z.object({ plan: z.enum(["monthly", "annual"]) });
@@ -20,6 +22,13 @@ export async function POST(request: Request) {
 
   const stripe = getStripe();
   let customerId = sessionUser.stripeCustomerId;
+  // Charge in the visitor's currency, unless this customer already pays in one: Stripe
+  // keeps each customer to a single currency.
+  let currency: string = (await currentRegion()).currency;
+  if (customerId) {
+    const existing = await stripe.customers.retrieve(customerId);
+    if (!existing.deleted && isCurrency(existing.currency)) currency = existing.currency;
+  }
   if (!customerId) {
     const customer = await stripe.customers.create(
       { email: sessionUser.email, name: sessionUser.name, metadata: { userId: sessionUser.id } },
@@ -35,6 +44,8 @@ export async function POST(request: Request) {
     customer: customerId,
     client_reference_id: sessionUser.id,
     line_items: [{ price: priceIdFor(parsed.data.plan), quantity: 1 }],
+    currency,
+    ...(stripeTaxEnabled() ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, billing_address_collection: "auto" as const } : {}),
     allow_promotion_codes: true, // book-buyer codes
     metadata,
     subscription_data: { metadata },

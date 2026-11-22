@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth";
-import { GIFT_MESSAGE_MAX_CHARS, GIFT_TERMS, PLANS, SITE } from "@/lib/config";
+import { GIFT_MESSAGE_MAX_CHARS, GIFT_TERMS, SITE } from "@/lib/config";
 import { getDb } from "@/lib/db";
-import { appUrl } from "@/lib/env";
+import { appUrl, stripeTaxEnabled } from "@/lib/env";
+import { currentRegion } from "@/lib/region-server";
+import { TAX_INCLUSIVE } from "@/lib/regions";
 import { attachCheckoutSession, createPendingGift } from "@/lib/gifts/service";
 import { getStripe } from "@/lib/stripe";
 
@@ -39,8 +41,10 @@ export async function POST(request: Request) {
   const sessionUser = await getSessionUser().catch(() => null);
 
   const db = getDb();
+  const { currency } = await currentRegion();
   const gift = await createPendingGift(db, {
     plan: input.plan,
+    currency,
     purchaserUserId: sessionUser?.id ?? null,
     purchaserName: input.purchaserName,
     purchaserEmail: input.purchaserEmail,
@@ -62,8 +66,9 @@ export async function POST(request: Request) {
         {
           quantity: 1,
           price_data: {
-            currency: "usd",
-            unit_amount: PLANS[input.plan].amountCents,
+            currency,
+            unit_amount: gift.amountCents,
+            tax_behavior: TAX_INCLUSIVE[currency] ? "inclusive" : "exclusive",
             product_data: {
               name: `${SITE.name} gift membership: ${term}`,
               description: `For ${input.recipientName}. Starts when they redeem it.`,
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
       ],
       metadata,
       payment_intent_data: { metadata },
+      ...(stripeTaxEnabled() ? { automatic_tax: { enabled: true }, billing_address_collection: "auto" as const } : {}),
       success_url: `${appUrl()}/gift/thanks?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl()}/gift`,
     },

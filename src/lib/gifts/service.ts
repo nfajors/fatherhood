@@ -6,9 +6,10 @@
  * or handed over by the purchaser) -> the recipient redeems it on their account.
  */
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { priceFor, type Currency } from "@/lib/regions";
 import type { Database } from "@/lib/db";
 import { gifts, revenueLedger, subscriptions, user, type GiftStatus } from "@/lib/db/schema";
-import { GIFT_TERMS, PLANS, type PlanId } from "@/lib/config";
+import { GIFT_TERMS, type PlanId } from "@/lib/config";
 import type { Mailer } from "@/lib/email";
 import { generateGiftCode, normalizeGiftCode } from "./codes";
 import { purchaserEmail, recipientEmail, type GiftForEmail } from "./emails";
@@ -26,7 +27,8 @@ export class GiftError extends Error {
       | "refunded"
       | "already_redeemed"
       | "already_redeemed_by_you"
-      | "no_billing_account",
+      | "no_billing_account"
+      | "currency_mismatch",
     message: string,
   ) {
     super(message);
@@ -36,7 +38,8 @@ export class GiftError extends Error {
 
 /** Applies a Stripe customer-balance credit (negative amount) or debit; returns the transaction id. */
 export interface BillingCredits {
-  adjust(customerId: string, amountCents: number, description: string, idempotencyKey: string): Promise<string>;
+  /** Adjust the customer's Stripe balance in `currency` (negative is credit). */
+  adjust(customerId: string, amountCents: number, currency: string, description: string, idempotencyKey: string): Promise<string>;
 }
 
 /** Add calendar months in UTC, clamping to the last day of shorter months (Jan 31 + 1 = Feb 28). */
@@ -70,6 +73,8 @@ export function toEmailGift(gift: Gift): GiftForEmail {
 
 export type NewGift = {
   plan: PlanId;
+  /** The buyer's currency (lib/regions.ts); US dollars when not given. */
+  currency?: Currency;
   purchaserUserId: string | null;
   purchaserName: string;
   purchaserEmail: string;
@@ -89,7 +94,8 @@ export async function createPendingGift(db: Database, input: NewGift): Promise<G
         ...input,
         code: generateGiftCode(),
         plan: input.plan,
-        amountCents: PLANS[input.plan].amountCents,
+        currency: input.currency ?? "usd",
+        amountCents: priceFor(input.plan, input.currency ?? "usd"),
         recipientEmail: input.delivery === "email" ? input.recipientEmail : null,
         deliverAt: input.delivery === "email" ? input.deliverAt : null,
         status: "pending_payment",
@@ -116,8 +122,21 @@ export async function getGiftByCheckoutSession(db: Database, sessionId: string):
  */
 export async function markGiftPaid(
   db: Executor,
-  payment: { giftId: string; checkoutSessionId: string; paymentIntentId: string | null; amountPaidCents: number; paidAt: Date },
+  payment: {
+    giftId: string;
+    checkoutSessionId: string;
+    paymentIntentId: string | null;
+    /** What the buyer paid, in `currency`. */
+    amountPaidCents: number;
+    currency?: string;
+    /** In US cents as Stripe settled it; required when the currency isn't US dollars. */
+    settledUsdCents?: number | null;
+    paidAt: Date;
+  },
 ): Promise<Gift | null> {
+  const currency = (payment.currency ?? "usd").toLowerCase();
+  const usdCents = currency === "usd" ? payment.amountPaidCents : payment.settledUsdCents;
+  if (usdCents === null || usdCents === undefined) throw new Error(`Gift ${payment.giftId}: no settled US amount for a ${currency} payment.`);
   const [paid] = await db
     .update(gifts)
     .set({
@@ -137,7 +156,9 @@ export async function markGiftPaid(
       kind: "gift",
       stripeObjectId: payment.checkoutSessionId,
       userId: paid.purchaserUserId,
-      amountCents: payment.amountPaidCents,
+      amountCents: usdCents,
+      currency,
+      originalAmountCents: payment.amountPaidCents,
       occurredAt: payment.paidAt,
     })
     .onConflictDoNothing();
@@ -244,9 +265,14 @@ export async function redeemGift(
     if (renewing) {
       const customerId = renewing.stripeCustomerId ?? input.user.stripeCustomerId;
       if (!customerId) throw new GiftError("no_billing_account", "We couldn't find your billing account. Please contact support.");
+      // Stripe keeps one balance per customer, in the currency they pay in.
+      if (renewing.currency !== gift.currency) {
+        throw new GiftError("currency_mismatch", "This gift was bought in a different currency from your membership. Please contact us and we'll add it for you.");
+      }
       const transactionId = await credits.adjust(
         customerId,
         -gift.amountCents,
+        gift.currency,
         `Gift membership ${gift.code}`,
         `gift-credit-${gift.id}`,
       );
@@ -336,7 +362,7 @@ export async function refundGiftPayment(
             .limit(1);
       // The credit may already be spent; reversing it then shows as a balance due on the next invoice.
       if (sub?.customerId) {
-        await credits.adjust(sub.customerId, gift.amountCents, `Refund of gift membership ${gift.code}`, `gift-credit-reversal-${gift.id}`);
+        await credits.adjust(sub.customerId, gift.amountCents, gift.currency, `Refund of gift membership ${gift.code}`, `gift-credit-reversal-${gift.id}`);
       }
     }
 

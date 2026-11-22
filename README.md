@@ -34,6 +34,7 @@ npm run dev                  # http://localhost:3000
 | `npm run themes:assign` | Run the AI theme classifier on content not yet classified (`--all` to redo everything) |
 | `npm run gifts:deliver` | Send scheduled gift emails that are due, and retry failed sends |
 | `npm run emails:run` | Enroll people in email sequences and send what's due (what the cron does) |
+| `npm run stripe:prices` | Show (or `-- --apply`) the local prices to add to the Stripe plan prices |
 | `npm run revenue:settle -- YYYY-MM` | Settle the creator revenue pool for a month (default: last month; the monthly cron does this) |
 
 Environment variables are validated per integration when first used
@@ -360,6 +361,43 @@ feed and in groups, "Me too" reactions, follows, and reply emails. No private me
 - **Following** shows the posts of people you follow (the "Following" tab); each person's page lists
   their posts.
 
+## International (Phase 3)
+
+English-speaking countries first: the United States, United Kingdom, Canada, Australia, New Zealand and
+Ireland (`src/lib/regions.ts`). Everywhere else is shown US prices in dollars.
+
+- **Local prices.** Each country has its currency and round prices you set in `PRICES` (today: $19/$199,
+  £15/£159, €17/€179, CA$25/CA$259, A$29/A$299, NZ$32/NZ$329). `npm run stripe:prices` shows what it would
+  change on the two Stripe plan prices, and `-- --apply` adds the local amounts as currency options with
+  their tax behavior. A plan price's US amount can't change in Stripe: to change it, create a new price and
+  update `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL`. Changing a local amount later may need the same.
+- **Which country.** The visitor's choice in the footer ("Prices for"), remembered in a cookie; otherwise
+  the country of the request (Cloudflare's `CF-IPCountry` header, so put the site behind Cloudflare's proxy
+  for this to work), then the browser's language (en-GB), else the US. Prices, the home page button and the
+  gift form show local prices; dates on members' pages follow the country's style (22 Nov 2026 in the UK).
+- **Checkout.** Memberships and gifts are charged in the visitor's currency. Stripe keeps each customer to
+  one currency, so someone who has paid before keeps paying in that currency.
+- **Tax.** With `STRIPE_TAX_ENABLED=true`, Checkout calculates and collects sales tax, VAT or GST and asks
+  for the billing address it needs. Prices include VAT/GST in the UK, Ireland, Australia and New Zealand,
+  and tax is added at checkout in the US and Canada (each currency's tax behavior on the Stripe price). Turn
+  it on after setting up Stripe Tax in the dashboard (origin address, then registrations as your accountant
+  advises), or Checkout won't start. Organization contracts are invoiced in US dollars without Stripe Tax.
+- **Revenue and the creator pool.** The revenue ledger keeps what the customer paid (currency and amount)
+  and, as `amount_cents`, the US dollars Stripe settled it for (from the charge's balance transaction). The
+  creator pool shares those settled dollars, so currency conversion and its fees are already counted. If
+  the settlement isn't available yet, the webhook asks Stripe to retry. Analytics shows recurring revenue
+  per currency, not converted.
+- **Gifts** are priced in the buyer's currency. A gift becomes billing credit only for a membership in the
+  same currency; otherwise the member is asked to contact us.
+- **Emails** no longer quote US prices; they link to the pricing page, which shows the local price.
+- **Your data** (account page): "Download my data" gives a JSON file of everything we hold about the person;
+  "Delete my account" (type DELETE) cancels billing at once and deletes the account and what belongs to it.
+  Payment records stay, without the person's name. Fellows with videos or earnings are asked to email us so
+  payouts are settled first. The site sets only cookies it needs (sign-in and the chosen country), so no
+  cookie banner is required for them.
+- **Not yet:** creator payouts are US-only (Stripe Connect accounts are created in the US), and the site is
+  in English only; dates, money and numbers are already formatted per country, so another language can follow.
+
 ## Lesson downloads
 
 Workbooks, PDFs and insight cards attached to lessons, stored in a private Cloudflare R2 bucket
@@ -633,6 +671,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, organization licensing, and Discussions (posts, groups, follows). Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, organization licensing, Discussions (posts, groups, follows), and international prices for English-speaking countries with Stripe Tax. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

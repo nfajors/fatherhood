@@ -9,7 +9,7 @@ import { refundGiftPayment } from "@/lib/gifts/service";
 import { recordContractPaid, recordInvoiceVoided } from "@/lib/organizations/service";
 import { contractIdFromInvoice } from "@/lib/organizations/runtime";
 import { recordTransferReversal } from "@/lib/payouts/service";
-import { getStripe, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
+import { getStripe, settledUsdForInvoice, toLedgerEntry, toSubscriptionRecord } from "@/lib/stripe";
 
 const SUBSCRIPTION_EVENTS = new Set([
   "customer.subscription.created",
@@ -82,6 +82,19 @@ export async function POST(request: Request) {
   const db = getDb();
   const prices = { monthly: env.STRIPE_PRICE_MONTHLY, annual: env.STRIPE_PRICE_ANNUAL };
 
+  // A paid invoice in another currency is recorded at the US dollars Stripe settled it for
+  // (the creator pool shares settled dollars). Looked up before the transaction; if the
+  // settlement isn't available yet, Stripe gets a 500 and retries.
+  let ledger: (NonNullable<ReturnType<typeof toLedgerEntry>> & { usdCents: number }) | null = null;
+  if (event.type === "invoice.paid") {
+    const entry = toLedgerEntry(event.data.object as Stripe.Invoice);
+    if (entry) {
+      const usdCents = entry.currency === "usd" ? entry.amountCents : await settledUsdForInvoice(entry.stripeInvoiceId);
+      if (usdCents === null) return NextResponse.json({ error: "settlement_not_ready" }, { status: 500 });
+      ledger = { ...entry, usdCents };
+    }
+  }
+
   await db.transaction(async (tx) => {
     const inserted = await tx
       .insert(processedWebhookEvents)
@@ -91,7 +104,7 @@ export async function POST(request: Request) {
     if (inserted.length === 0) return; // already handled
 
     if (event.type === "invoice.paid") {
-      const entry = toLedgerEntry(event.data.object as Stripe.Invoice);
+      const entry = ledger;
       if (!entry) return;
       const owner = await tx.query.user.findFirst({
         where: eq(user.stripeCustomerId, entry.stripeCustomerId),
@@ -103,7 +116,9 @@ export async function POST(request: Request) {
           kind: "subscription_invoice",
           stripeObjectId: entry.stripeInvoiceId,
           userId: owner?.id ?? null,
-          amountCents: entry.amountCents,
+          amountCents: entry.usdCents,
+          currency: entry.currency,
+          originalAmountCents: entry.amountCents,
           occurredAt: entry.paidAt,
         })
         .onConflictDoNothing();
@@ -138,6 +153,7 @@ export async function POST(request: Request) {
           stripePriceId: record.stripePriceId,
           currentPeriodEnd: record.currentPeriodEnd,
           cancelAtPeriodEnd: record.cancelAtPeriodEnd,
+          currency: record.currency,
         },
       });
   });

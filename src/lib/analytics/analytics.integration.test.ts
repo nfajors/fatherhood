@@ -70,17 +70,23 @@ describe.skipIf(!url)("analytics (Postgres)", () => {
     await sub("e", "monthly", "incomplete_expired", daysAgo(5), daysAgo(-25));
     // Ended in the previous range.
     await sub("f", "monthly", "canceled", daysAgo(50), daysAgo(9), { updatedAt: daysAgo(9) });
+    await person("g", daysAgo(60));
+    await sub("g", "annual", "active", daysAgo(70), daysAgo(-200), { currency: "gbp" });
 
     const m = await membership(db, range);
-    expect(m.active).toBe(3);
-    expect(m.plans).toEqual({ monthly: 1, annual: 1, gift: 1, organization: 0 });
+    expect(m.active).toBe(4);
+    expect(m.plans).toEqual({ monthly: 1, annual: 2, gift: 1, organization: 0 });
     expect(m.mrrCents).toBe(1900 + Math.round(19900 / 12));
-    expect({ renewing: m.renewing, cancelling: m.cancelling }).toEqual({ renewing: 1, cancelling: 1 });
+    expect(m.mrrByCurrency).toEqual([
+      { currency: "usd", cents: 1900 + Math.round(19900 / 12) },
+      { currency: "gbp", cents: Math.round(15900 / 12) },
+    ]);
+    expect({ renewing: m.renewing, cancelling: m.cancelling }).toEqual({ renewing: 2, cancelling: 1 });
     expect(m.started).toEqual({ current: 1, previous: 0 });
     expect(m.ended).toEqual({ current: 1, previous: 1 });
-    expect(m.activeAtStart).toBe(3); // a, c, d
-    expect(m.churnRate).toBeCloseTo(1 / 3);
-    expect(m.daily.map((d) => d.value)).toEqual([3, 3, 3, 4, 3, 3, 3]);
+    expect(m.activeAtStart).toBe(4); // a, c, d, g
+    expect(m.churnRate).toBeCloseTo(1 / 4);
+    expect(m.daily.map((d) => d.value)).toEqual([4, 4, 4, 5, 4, 4, 4]);
   });
 
   it("totals revenue by range and month, with the creator pool's share", async () => {

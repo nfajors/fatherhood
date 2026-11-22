@@ -6,9 +6,8 @@
  * already have. A step that has nothing useful to say returns null and is
  * skipped. Who gets enrolled when is in engine.ts.
  */
-import { PLANS, SITE } from "@/lib/config";
+import { MONEY_BACK_GUARANTEE_DAYS, SITE } from "@/lib/config";
 import type { EmailCategory } from "@/lib/db/schema";
-import { formatMoney } from "@/lib/format";
 import type { EmailContent, EmailItem } from "./template";
 
 /** What a sequence email can draw on, loaded for one person (context.ts). */
@@ -52,7 +51,6 @@ export type Sequence = {
   exitReason(ctx: EmailContext, enrolledAt: Date): string | null;
 };
 
-const price = `${formatMoney(PLANS.monthly.amountCents)} a month or ${formatMoney(PLANS.annual.amountCents)} a year`;
 
 function startItems(ctx: EmailContext): EmailItem[] {
   const items: EmailItem[] = [];
@@ -119,7 +117,7 @@ const welcome: Sequence = {
           ? null
           : {
               subject: "What's inside the Academy",
-              preheader: `Every course, new ones each month, for ${price}.`,
+              preheader: "Every course, with new ones each month, in one membership.",
               heading: "What membership gets you",
               blocks: [
                 {
@@ -127,7 +125,10 @@ const welcome: Sequence = {
                   text: `The Academy is a library of structured courses: short lessons you can watch in a spare ten minutes, with workbooks, quizzes and a certificate when you finish.`,
                 },
                 { kind: "items", items: ctx.courses.slice(0, 3) },
-                { kind: "p", text: `Membership is ${price}, and includes every course, with new ones each month. Cancel any time.` },
+                {
+                  kind: "p",
+                  text: `One membership includes every course, with new ones each month, priced in your currency. Cancel any time, with a ${MONEY_BACK_GUARANTEE_DAYS}-day money-back guarantee.`,
+                },
                 { kind: "button", label: "See membership", href: "/pricing" },
                 ctx.freeLesson
                   ? { kind: "small", text: `Not sure yet? "${ctx.freeLesson.title}" is free to watch.` }

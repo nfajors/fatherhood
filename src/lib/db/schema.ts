@@ -151,6 +151,8 @@ export const subscriptions = pgTable(
     stripePriceId: text("stripe_price_id"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    /** The subscription's currency (lib/regions.ts); a Stripe customer pays in one currency. */
+    currency: text("currency").notNull().default("usd"),
     /** For plan "organization": the seat this access comes from. */
     organizationMemberId: uuid("organization_member_id")
       .unique()
@@ -178,7 +180,9 @@ export const gifts = pgTable(
     /** "annual" or "monthly": what the gift is worth. */
     plan: subscriptionPlan("plan").notNull(),
     status: giftStatus("status").notNull().default("pending_payment"),
+    /** What the buyer paid, in minor units of `currency`. */
     amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull().default("usd"),
     purchaserUserId: text("purchaser_user_id").references(() => user.id, { onDelete: "set null" }),
     purchaserEmail: text("purchaser_email").notNull(),
     /** How the gift is signed, e.g. "Dad" or "Your brother Marcus". */
@@ -698,7 +702,11 @@ export const revenueLedger = pgTable(
     /** Stripe invoice or checkout session id; unique so webhook retries are no-ops. */
     stripeObjectId: text("stripe_object_id").notNull().unique(),
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    /** In US cents, as Stripe settled it into the platform's balance: what the creator pool shares. */
     amountCents: integer("amount_cents").notNull(),
+    /** What the customer paid, in their currency (minor units). */
+    currency: text("currency").notNull().default("usd"),
+    originalAmountCents: integer("original_amount_cents"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

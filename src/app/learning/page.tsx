@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { getSessionUser } from "@/lib/auth";
 import { canUseCoach, coachConfigured } from "@/lib/coach/access";
 import { getPath } from "@/lib/coach/path";
+import { currentRegion } from "@/lib/region-server";
+import { formatDate } from "@/lib/regions";
 import { continueWatching, coursesInProgress } from "@/lib/courses/catalog";
 import { getDb } from "@/lib/db";
 import { recommendFor } from "@/lib/discovery/recommend";
@@ -22,6 +24,7 @@ export default async function LearningPage() {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/sign-in?next=/learning");
   const db = getDb();
+  const region = await currentRegion();
   const [watching, courses, recs, certificates, coach] = await Promise.all([
     continueWatching(db, sessionUser.id),
     coursesInProgress(db, sessionUser.id),
@@ -135,7 +138,7 @@ export default async function LearningPage() {
                   <span className="min-w-0">
                     <span className="block font-semibold text-navy-900 group-hover:underline">{c.courseTitle}</span>
                     <span className="text-sm text-muted">
-                      Completed {c.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" })}
+                      Completed {formatDate(c.issuedAt, region.locale)}
                     </span>
                   </span>
                 </Link>

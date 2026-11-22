@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth";
 import { SITE } from "@/lib/config";
 import { getDb } from "@/lib/db";
+import { currentRegion } from "@/lib/region-server";
 import { appUrl } from "@/lib/env";
 import { certificateByCode, linkedInAddUrl } from "@/lib/learning/certificates";
 
@@ -15,7 +16,7 @@ type Params = { params: Promise<{ code: string }> };
 
 const CODE = /^FS-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/i;
 
-const issued = (date: Date) => date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+const issuedIn = (locale: string) => (date: Date) => date.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { code } = await params;
@@ -50,7 +51,8 @@ export default async function CertificatePage({ params }: Params) {
     );
   }
 
-  const viewer = await getSessionUser().catch(() => null);
+  const [viewer, region] = await Promise.all([getSessionUser().catch(() => null), currentRegion()]);
+  const issued = issuedIn(region.locale);
   const mine = viewer?.id === c.userId;
 
   return (

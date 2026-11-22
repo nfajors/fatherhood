@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
-import { planForPriceId, toLedgerEntry, toSubscriptionRecord } from "./stripe";
+import { planForPriceId, toLedgerEntry, toSubscriptionRecord, usdFromBalanceTransaction } from "./stripe";
 
 const prices = { monthly: "price_monthly", annual: "price_annual" };
 
@@ -10,6 +10,7 @@ function subscription(overrides: Partial<Record<string, unknown>> = {}, itemOver
     status: "active",
     customer: "cus_1",
     cancel_at_period_end: false,
+    currency: "gbp",
     metadata: { userId: "user-1" },
     items: { data: [{ price: { id: "price_annual" }, current_period_end: 1_800_000_000, ...itemOverrides }] },
     ...overrides,
@@ -36,6 +37,7 @@ describe("toSubscriptionRecord", () => {
       stripePriceId: "price_annual",
       currentPeriodEnd: new Date(1_800_000_000 * 1000),
       cancelAtPeriodEnd: false,
+      currency: "gbp",
     });
   });
 
@@ -95,5 +97,13 @@ describe("toLedgerEntry", () => {
     expect(toLedgerEntry(invoice({ amount_paid: 0 }))).toBeNull();
     expect(toLedgerEntry(invoice({ customer: null }))).toBeNull();
     expect(toLedgerEntry(invoice({ id: undefined }))).toBeNull();
+  });
+});
+
+describe("usdFromBalanceTransaction", () => {
+  it("takes the settled amount only when it settled in US dollars", () => {
+    expect(usdFromBalanceTransaction({ amount: 1_987, currency: "usd" })).toBe(1_987);
+    expect(usdFromBalanceTransaction({ amount: 1_500, currency: "gbp" })).toBeNull();
+    expect(usdFromBalanceTransaction(null)).toBeNull();
   });
 });
