@@ -10,6 +10,7 @@ export function accountLinks(role: string | undefined) {
     ...(role === "admin" ? [{ href: "/admin/moderation", label: "Admin" }] : []),
     ...(role === "creator" || role === "admin" ? [{ href: "/studio", label: "Studio" }] : []),
     { href: "/learning", label: "My Learning" },
+    { href: "/coach", label: "Coach" },
     { href: "/account", label: "Account" },
   ];
 }

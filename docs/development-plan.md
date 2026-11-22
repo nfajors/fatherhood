@@ -279,6 +279,8 @@ real engagement data exists.
   - Recommendations: simple collaborative filtering or LLM-based later
 - **Email:** Resend
 - **Deployment:** Cloudflare Pages + Workers, or Vercel + Cloudflare Stream
+  *Decided November 22, 2026:* Railway (web service, scheduler service, Postgres) with Cloudflare
+  Stream and R2. See "Deploying on Railway" in the README.
 
 ### 5.2 Key Data Models (High-Level)
 - Users (roles: free, subscriber, creator, admin)
@@ -349,6 +351,10 @@ real engagement data exists.
 - Full social features.
 - B2B licensing portal.
 - Advanced AI (personalized paths, AI coaching companion).
+  *Built November 22, 2026:* the Coach at `/coach` for members: streaming conversations grounded
+  in the library (search and read tools) and each father's progress, a personalized learning path
+  from his profile, crisis resources on every page, private and deletable conversations, and a
+  daily message limit.
 - International expansion.
 
 **Immediate Priorities for Claude Code:**

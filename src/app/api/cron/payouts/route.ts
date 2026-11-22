@@ -5,12 +5,11 @@ import { autoSendEnabled, payoutNotifier, stripePayouts } from "@/lib/payouts/ru
 import { runPayouts } from "@/lib/payouts/service";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
 
 /**
  * Asks creators with a waiting payout to set up their payout account, and (with
  * PAYOUTS_AUTO_SEND=true) sends pending payouts past their hold. Call daily with
- * `Authorization: Bearer $CRON_SECRET` (vercel.json does this on Vercel).
+ * `Authorization: Bearer $CRON_SECRET` (scripts/cron-tick.mjs does this).
  */
 export async function GET(request: Request) {
   if (!authorizedCron(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
