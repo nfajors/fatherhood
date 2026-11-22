@@ -289,6 +289,8 @@ export const videos = pgTable(
     ratingCount: integer("rating_count").notNull().default(0),
     viewCount: integer("view_count").notNull().default(0),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    /** When Stream finished the MP4 download used for offline viewing in the app. */
+    downloadReadyAt: timestamp("download_ready_at", { withTimezone: true }),
     /** When the theme classifier last ran on this video. */
     themedAt: timestamp("themed_at", { withTimezone: true }),
     searchVector: tsvector("search_vector").generatedAlwaysAs(
@@ -491,6 +493,25 @@ export const watchProgress = pgTable(
     ...timestamps,
   },
   (t) => [primaryKey({ columns: [t.userId, t.videoId] }), index("watch_progress_video_id_idx").on(t.videoId)],
+);
+
+/**
+ * A video a member keeps on his phone for offline viewing (lib/mobile/downloads.ts).
+ * The app deletes the file when the license runs out unless it was renewed online.
+ */
+export const offlineLicenses = pgTable(
+  "offline_licenses",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.videoId] }), index("offline_licenses_video_id_idx").on(t.videoId)],
 );
 
 /**

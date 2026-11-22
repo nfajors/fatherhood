@@ -398,6 +398,29 @@ Ireland (`src/lib/regions.ts`). Everywhere else is shown US prices in dollars.
 - **Not yet:** creator payouts are US-only (Stripe Connect accounts are created in the US), and the site is
   in English only; dates, money and numbers are already formatted per country, so another language can follow.
 
+## Mobile apps (Phase 3)
+
+The iOS and Android app is in [`mobile/`](mobile/README.md) (Expo / React Native). Members sign in
+with their website account; the app has the Academy, Community Voices, the player, the coach and
+30-day offline downloads. It sells nothing and shows no prices (Apple and Google "reader app"
+rules), so memberships are still bought on the website.
+
+- **Sign-in.** Better Auth's bearer plugin: the app signs in at `/api/auth/sign-in/email`, keeps
+  the token from the `set-auth-token` header in the phone's secure storage, and sends it as
+  `Authorization: Bearer …`. Every API route that reads the session accepts it.
+- **API.** `/api/mobile/v1`: `me`, `home`, `courses`, `courses/[slug]`, `community`, `videos/[id]`,
+  `coach`, `coach/conversations/[id]`, `downloads/[videoId]` (POST to download, DELETE to remove),
+  `downloads/check` and `progress`. The player, heartbeats and coach messages use the same endpoints
+  as the website. Responses are small and stable because installed apps lag behind the server;
+  `me.minAppVersion` (in `src/lib/mobile/api.ts`) asks people on older builds to update.
+- **Offline downloads** (`src/lib/mobile/downloads.ts`): members only, up to 40 at a time. The
+  first download of a video asks Cloudflare Stream to make its MP4 (`videos.download_ready_at`
+  records when it's ready); each download is a signed link with Stream's `downloadable` claim and
+  a 30-day license (`offline_licenses`). The app renews licenses when online; they're revoked when
+  membership ends or the video is unpublished, and the app then deletes the file. Progress made
+  offline is saved when the app syncs (newest record wins), but views and creator-pool time are
+  only counted while streaming.
+
 ## Lesson downloads
 
 Workbooks, PDFs and insight cards attached to lessons, stored in a private Cloudflare R2 bucket
@@ -671,6 +694,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, organization licensing, Discussions (posts, groups, follows), and international prices for English-speaking countries with Stripe Tax. Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, organization licensing, Discussions (posts, groups, follows), international prices for English-speaking countries with Stripe Tax, and the iOS and Android app (Expo) with offline downloads and the coach. Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

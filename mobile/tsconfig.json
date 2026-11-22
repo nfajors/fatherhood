@@ -1,0 +1,9 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "../src/lib/coach/format.ts", "../src/lib/mobile/targets.ts"],
+  "exclude": ["node_modules", "**/*.test.ts"]
+}
