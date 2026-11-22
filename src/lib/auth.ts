@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { bearer } from "better-auth/plugins/bearer";
 import { headers } from "next/headers";
 import { getDb, schema } from "@/lib/db";
 import type { UserRole } from "@/lib/db/schema";
@@ -34,7 +35,8 @@ function createAuth() {
         stripeCustomerId: { type: "string", required: false, input: false },
       },
     },
-    plugins: [nextCookies()],
+    // bearer: the mobile app sends its session token as "Authorization: Bearer ..." instead of a cookie.
+    plugins: [nextCookies(), bearer()],
   });
 }
 

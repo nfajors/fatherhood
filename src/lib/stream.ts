@@ -199,6 +199,21 @@ export class StreamClient {
     return `${this.playbackUrls(uidOrToken).thumbnail}?time=${Math.max(0, Math.round(seconds))}s&height=${height}`;
   }
 
+  /**
+   * Ask Stream to make the video's MP4 download (it takes a few minutes the first time).
+   * Safe to call again: it reports the existing download's progress.
+   */
+  async enableDownload(uid: string): Promise<{ status: "ready" | "inprogress" | "error"; percentComplete: number }> {
+    const result = await this.request<{ default?: { status?: string; percentComplete?: number } }>("POST", `/${encodeURIComponent(uid)}/downloads`);
+    const status = result.default?.status;
+    return { status: status === "ready" || status === "error" ? status : "inprogress", percentComplete: result.default?.percentComplete ?? 0 };
+  }
+
+  /** The MP4 download for a video uid, or for a signed token with the downloadable claim. */
+  downloadUrl(uidOrToken: string): string {
+    return `https://customer-${this.config.customerCode}.cloudflarestream.com/${uidOrToken}/downloads/default.mp4`;
+  }
+
   /** Playback URLs for a video uid, or for a signed token (which replaces the uid). */
   playbackUrls(uidOrToken: string) {
     const base = `https://customer-${this.config.customerCode}.cloudflarestream.com/${uidOrToken}`;
@@ -231,12 +246,14 @@ export async function signPlaybackToken(options: {
   keyId: string;
   jwkBase64: string;
   ttlSeconds: number;
+  /** Allow fetching the MP4 download with this token (Stream's "downloadable" claim). */
+  downloadable?: boolean;
   now?: Date;
 }): Promise<string> {
   const jwk = JSON.parse(Buffer.from(options.jwkBase64, "base64").toString("utf8")) as JWK;
   const key = await importJWK(jwk, "RS256");
   const nowSeconds = Math.floor((options.now ?? new Date()).getTime() / 1000);
-  return new SignJWT({ kid: options.keyId })
+  return new SignJWT({ kid: options.keyId, ...(options.downloadable ? { downloadable: true } : {}) })
     .setProtectedHeader({ alg: "RS256", kid: options.keyId })
     .setSubject(options.videoUid)
     // Small clock-skew allowance for viewers whose clocks run slow.

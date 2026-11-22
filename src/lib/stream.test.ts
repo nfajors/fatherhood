@@ -157,6 +157,16 @@ describe("StreamClient", () => {
     expect(urls.hls).toBe("https://customer-abc123.cloudflarestream.com/tokenOrUid/manifest/video.m3u8");
     expect(urls.iframe).toBe("https://customer-abc123.cloudflarestream.com/tokenOrUid/iframe");
   });
+
+  it("turns on the MP4 download and reports its progress", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ success: true, result: { default: { status: "inprogress", percentComplete: 42.5 } } }));
+    const client = make(fetchMock as unknown as typeof fetch);
+    expect(await client.enableDownload("vid1")).toEqual({ status: "inprogress", percentComplete: 42.5 });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acct/stream/vid1/downloads");
+    expect(init.method).toBe("POST");
+    expect(client.downloadUrl("tok")).toBe("https://customer-abc123.cloudflarestream.com/tok/downloads/default.mp4");
+  });
 });
 
 describe("signPlaybackToken", () => {
@@ -174,6 +184,10 @@ describe("signPlaybackToken", () => {
     expect(payload.kid).toBe("key1");
     expect(payload.exp).toBe(nowSeconds + 600);
     expect(payload.nbf).toBe(nowSeconds - 60);
+    expect(payload.downloadable).toBeUndefined();
+
+    const download = await signPlaybackToken({ videoUid: "vid1", keyId: "key1", jwkBase64, ttlSeconds: 600, now, downloadable: true });
+    expect((await jwtVerify(download, publicKey)).payload.downloadable).toBe(true);
   });
 });
 

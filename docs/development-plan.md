@@ -348,6 +348,9 @@ real engagement data exists.
 
 **Phase 3 – Scale (Year 2+)**
 - Native mobile apps (offline).
+  *Built November 22, 2026:* an Expo app for iOS and Android in `mobile/`: members sign in with their
+  website account (no purchases in the app), the Academy, Community Voices, the player, the coach,
+  and downloads that play offline for 30 days. Discussions and push notifications come later.
 - Full social features.
   *Built November 22, 2026:* Discussions: member posts and replies in a feed and team-created groups,
   "Me too" reactions, follows, reply emails, an AI check before posts appear with a moderator queue,
