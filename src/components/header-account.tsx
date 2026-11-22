@@ -34,7 +34,7 @@ export function HeaderAccount() {
   return (
     <div className="flex items-center gap-1 text-sm">
       {accountLinks((data.user as { role?: string }).role).map((l) => (
-        <Button key={l.href} asChild variant="ghost" size="sm" className="whitespace-nowrap text-white hover:bg-white/10">
+        <Button key={l.href} asChild variant="ghost" size="sm" className="whitespace-nowrap px-2 text-white hover:bg-white/10">
           <Link href={l.href}>{l.label}</Link>
         </Button>
       ))}

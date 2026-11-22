@@ -52,7 +52,7 @@ marketing email). Unsubscribe links are signed with `EMAIL_TOKEN_SECRET`, or
 `BETTER_AUTH_SECRET` if that's not set; changing the secret breaks links in emails already sent.
 
 **Scheduled jobs.** Set `CRON_SECRET`. Five jobs run on a schedule (`scripts/jobs.mjs`, all UTC):
-moderation every 10 minutes, email sequences every 15, gift delivery hourly, organization access daily at
+moderation every 10 minutes, discussion posts the AI couldn't check every 10 (offset by 5), email sequences every 15, gift delivery hourly, organization access daily at
 06:00, payouts daily at 16:00
 and last month's revenue settlement at 12:00 on the 2nd (the 3rd and 4th catch a missed run).
 `scripts/cron-tick.mjs`, run every 5 minutes, calls whichever are due on the web service with
@@ -124,6 +124,7 @@ src/
     manifest.ts, offline/   installable app and the page shown without a connection
     coach/, api/coach/...   the AI coach: conversations (streamed), profile, learning path
     admin/organizations, org/[slug], join/  organization licenses: contracts, managers' page, joining
+    discussions/, api/discussions/...  posts, groups, follows, the moderation queue
     admin/analytics         membership, revenue, viewing and learning figures
     api/stripe/webhook      sync subscriptions (idempotent)
     api/stripe/connect-webhook  creators' payout account status (Stripe Connect)
@@ -328,6 +329,36 @@ universities, the military, courts and faith communities (`/for-organizations` e
 - **Revenue.** Paid contracts go into the revenue ledger (`organization`), so 25% funds the creator
   pool like memberships; the whole contract counts in the month it's paid.
 - **Setup.** Add `invoice.voided` to the main Stripe webhook's events (`invoice.paid` is already there).
+
+## Discussions (Phase 3)
+
+`src/lib/discussions/`, at `/discussions` (in the header). Posts and replies (one level) in a main
+feed and in groups, "Me too" reactions, follows, and reply emails. No private messages.
+
+- **Who.** Members (paid, gift or organization seat), Fellows and admins post, reply and react;
+  anyone signed in reads, reacts and follows. Signed-out visitors are sent to sign in, and pages
+  aren't indexed. Names show as first name and last initial, with Fellow and team badges. Posts are
+  plain text, with no links or formatting.
+- **Groups** are created by our team at `/admin/discussions` ("Add starter groups" adds Expecting, New
+  dads, School-age kids, Dads of teens, Co-parenting, Military dads, Faith and fatherhood and Grieving
+  fathers). Members join a group to post in it; anyone can read it and reply. Admins archive groups
+  and make people group moderators by email.
+- **The AI check** (`screen.ts`, Claude, low effort): every post, reply and edit is read before it
+  appears. Clear posts appear at once; posts in a policy area (`policy.ts`: harassment or hate,
+  threats, sexual content, possible self-harm, a child's identifying details or safety, someone's
+  personal information, spam, dangerous or illegal help) wait for a moderator, and the author is told,
+  with crisis resources when he or someone with him may be in danger. A post the check couldn't
+  read waits too, and the 10-minute job (`/api/cron/discussions`) tries again. The AI never removes
+  anything. Without `ANTHROPIC_API_KEY`, posts appear at once and reports still apply.
+- **Reports and moderation.** Readers report a post (one open report each); 3 reporters hide it until a
+  moderator decides. The queue (`/discussions/moderate`) shows held, unchecked, reported and hidden
+  posts with the AI's reasons and the report reasons; admins see everything, group moderators their
+  groups. Moderators approve, hide, restore or remove, from the queue or the post itself.
+- **Limits.** 6 posts and replies per person per 10 minutes; posts up to 3,000 characters, replies 2,000.
+- **Reply emails.** Whoever started a thread hears about replies, at most once per thread every 6 hours,
+  under the "Replies to your comments" email setting.
+- **Following** shows the posts of people you follow (the "Following" tab); each person's page lists
+  their posts.
 
 ## Lesson downloads
 
@@ -602,6 +633,6 @@ course catalog, course builder, video player with watch tracking and progress, C
 Voices library, My Learning, Fellow applications, creator Studio (uploads, review status and
 resubmission, dashboard, earnings), ratings and reviews, search, lesson downloads.
 
-Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, and organization licensing. Before launch: configure the production services (Stripe and Stripe Connect,
+Phase 1 is feature-complete. Phase 2 is complete: comments, collections, recommendations, trending, quizzes and certificates, email sequences and reply notifications, automated creator payouts (Stripe Connect), admin analytics, and the installable app (PWA) with a phone and tablet header. Phase 3 so far: the AI coach with personalized learning paths, organization licensing, and Discussions (posts, groups, follows). Before launch: configure the production services (Stripe and Stripe Connect,
 Cloudflare Stream and R2, Resend, Anthropic), run one real upload and download of each kind
 in staging, and write the terms (including content licensing for uploads).

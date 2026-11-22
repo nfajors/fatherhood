@@ -349,6 +349,9 @@ real engagement data exists.
 **Phase 3 – Scale (Year 2+)**
 - Native mobile apps (offline).
 - Full social features.
+  *Built November 22, 2026:* Discussions: member posts and replies in a feed and team-created groups,
+  "Me too" reactions, follows, reply emails, an AI check before posts appear with a moderator queue,
+  reports, and group moderators. No private messages, by design.
 - B2B licensing portal.
   *Built November 22, 2026:* sales-led seat licenses (contracts priced per organization, Stripe
   invoices), email invitations and join codes, a managers' page with consent-based reporting and
