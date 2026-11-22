@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmailSettingsForm } from "@/components/email/email-settings";
+import { PrivacyControls } from "@/components/account/privacy-controls";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { SharingControls } from "@/components/organizations/forms";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { CATEGORY_LABELS } from "@/lib/emails/policy";
 import { getPreferences } from "@/lib/emails/preferences";
 import { hasActiveMembership } from "@/lib/entitlements";
 import { membershipsFor } from "@/lib/organizations/service";
+import { currentRegion } from "@/lib/region-server";
+import { formatDate } from "@/lib/regions";
 
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
@@ -23,7 +26,7 @@ export default async function AccountPage() {
   if (!sessionUser) redirect("/sign-in?next=/account");
 
   const db = getDb();
-  const [prefs, orgs] = await Promise.all([getPreferences(db, sessionUser.id), membershipsFor(db, sessionUser.id)]);
+  const [prefs, orgs, region] = await Promise.all([getPreferences(db, sessionUser.id), membershipsFor(db, sessionUser.id), currentRegion()]);
   const rows = await db
     .select()
     .from(subscriptions)
@@ -40,7 +43,7 @@ export default async function AccountPage() {
         {active && current ? (
           <CardDescription>
             {{ annual: "Annual", monthly: "Monthly", gift: "Gift", organization: "Organization" }[current.plan]} membership,{" "}
-            {current.cancelAtPeriodEnd ? "ends" : "renews"} {current.currentPeriodEnd.toLocaleDateString("en-US", { dateStyle: "long" })}.
+            {current.cancelAtPeriodEnd ? "ends" : "renews"} {formatDate(current.currentPeriodEnd, region.locale, "long")}.
           </CardDescription>
         ) : (
           <CardDescription>You don&apos;t have an active membership.</CardDescription>
@@ -72,7 +75,7 @@ export default async function AccountPage() {
                   <>
                     <p className="mt-1 text-sm text-muted">
                       {o.accessStatus === "active" && o.accessUntil && o.accessUntil > new Date()
-                        ? `Your access through ${o.orgName} runs until ${new Date(o.accessUntil.getTime() - 1).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "UTC" })}.`
+                        ? `Your access through ${o.orgName} runs until ${formatDate(new Date(o.accessUntil.getTime() - 1), region.locale, "long")}.`
                         : `Your access through ${o.orgName} isn't active right now.`}
                     </p>
                     <div className="mt-2">
@@ -89,6 +92,11 @@ export default async function AccountPage() {
         <CardTitle>Email</CardTitle>
         <CardDescription className="mb-5">Sent to {sessionUser.email}.</CardDescription>
         <EmailSettingsForm initial={prefs} labels={CATEGORY_LABELS} />
+      </Card>
+      <Card className="mt-6" id="privacy">
+        <CardTitle>Your data</CardTitle>
+        <CardDescription className="mb-5">Download a copy of your data, or delete your account.</CardDescription>
+        <PrivacyControls />
       </Card>
     </div>
   );

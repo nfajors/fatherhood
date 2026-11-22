@@ -39,7 +39,7 @@ describe("sequences", () => {
     });
     expect(step("welcome", "stories").render(sampleContext({ stories: [] }))).toBeNull();
     expect(step("welcome", "membership").render(sampleContext({ courses: [] }))).toBeNull();
-    expect(texts(step("welcome", "membership").render(sampleContext()))).toContain("$19.00 a month or $199.00 a year");
+    expect(texts(step("welcome", "membership").render(sampleContext()))).toContain("priced in your currency");
   });
 
   it("the first-week nudge depends on what they've done", () => {

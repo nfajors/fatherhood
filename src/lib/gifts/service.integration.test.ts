@@ -45,7 +45,9 @@ class RecordingMailer implements Mailer {
 
 class FakeCredits implements BillingCredits {
   calls: { customerId: string; amountCents: number; key: string }[] = [];
-  async adjust(customerId: string, amountCents: number, _description: string, key: string) {
+  currencies: string[] = [];
+  async adjust(customerId: string, amountCents: number, currency: string, _description: string, key: string) {
+    this.currencies.push(currency);
     this.calls.push({ customerId, amountCents, key });
     return `cbtxn_${this.calls.length}`;
   }
@@ -100,6 +102,9 @@ describe.skipIf(!url)("gift memberships (Postgres)", () => {
       checkoutSessionId: `cs_${sessionCounter}`,
       paymentIntentId: `pi_${sessionCounter}`,
       amountPaidCents: gift.amountCents,
+      currency: gift.currency,
+      // A made-up conversion for gifts bought in another currency.
+      settledUsdCents: gift.currency === "usd" ? undefined : Math.round(gift.amountCents * 1.25),
       paidAt: NOW,
     });
     return paid!;
@@ -230,6 +235,28 @@ describe.skipIf(!url)("gift memberships (Postgres)", () => {
       expect(credits.calls).toEqual([{ customerId: "cus_sam", amountCents: -199_00, key: `gift-credit-${gift.id}` }]);
       expect(await db.$count(schema.subscriptions, eq(schema.subscriptions.userId, "subscriber"))).toBe(1);
       expect(await giftRow(gift.id)).toMatchObject({ redemption: "billing_credit", stripeBalanceTransactionId: "cbtxn_1" });
+      expect(credits.currencies).toEqual(["usd"]);
+    });
+
+    it("prices a gift in the buyer's currency, records the settled dollars, and won't credit a membership in another currency", async () => {
+      const gift = await paidGift({ currency: "gbp" });
+      expect(gift).toMatchObject({ currency: "gbp", amountCents: 159_00 });
+      const [ledger] = await db.select().from(schema.revenueLedger).where(eq(schema.revenueLedger.kind, "gift"));
+      expect(ledger).toMatchObject({ currency: "gbp", originalAmountCents: 159_00, amountCents: 198_75 });
+
+      await db.insert(schema.subscriptions).values({
+        userId: "subscriber",
+        plan: "annual",
+        status: "active",
+        stripeSubscriptionId: "sub_usd",
+        stripeCustomerId: "cus_sam",
+        currentPeriodEnd: new Date("2027-03-01T00:00:00Z"),
+      });
+      await expect(redeem(gift.code, "subscriber", "cus_sam")).rejects.toMatchObject({ reason: "currency_mismatch" });
+      expect(credits.calls).toEqual([]);
+      await expect(
+        markGiftPaid(db, { giftId: (await createPendingGift(db, newGift({ currency: "aud" }))).id, checkoutSessionId: "cs_x", paymentIntentId: null, amountPaidCents: 299_00, currency: "aud", paidAt: NOW }),
+      ).rejects.toThrow("no settled US amount");
     });
 
     it("explains every reason a code can't be redeemed", async () => {

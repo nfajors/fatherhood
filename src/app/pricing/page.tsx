@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { MONEY_BACK_GUARANTEE_DAYS, PLANS } from "@/lib/config";
+import { MONEY_BACK_GUARANTEE_DAYS } from "@/lib/config";
+import { currentRegion } from "@/lib/region-server";
+import { formatPrice, priceFor, taxNote } from "@/lib/regions";
 
 export const metadata: Metadata = { title: "Pricing" };
+export const dynamic = "force-dynamic";
 
 const INCLUDED = [
   "Every Professional Academy course, including new monthly releases",
@@ -13,8 +16,10 @@ const INCLUDED = [
   "Rate, review and discuss every lesson",
 ];
 
-export default function PricingPage() {
-  const monthlyEquivalent = (PLANS.annual.amountCents / 12 / 100).toFixed(2);
+export default async function PricingPage() {
+  const region = await currentRegion();
+  const price = (plan: "monthly" | "annual") => formatPrice(priceFor(plan, region.currency), region.currency, region.locale);
+  const monthlyEquivalent = formatPrice(Math.round(priceFor("annual", region.currency) / 12), region.currency, region.locale);
   return (
     <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
       <h1 className="text-4xl font-semibold sm:text-5xl">One membership. Every course.</h1>
@@ -27,8 +32,8 @@ export default function PricingPage() {
         <Card className="border-2 border-gold-500">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">Best value</p>
           <CardTitle className="mt-2">Annual</CardTitle>
-          <p className="mt-4 font-serif text-5xl text-navy-900">${PLANS.annual.amountCents / 100}</p>
-          <CardDescription>per year, about ${monthlyEquivalent} a month</CardDescription>
+          <p className="mt-4 font-serif text-5xl text-navy-900">{price("annual")}</p>
+          <CardDescription>per year, about {monthlyEquivalent} a month</CardDescription>
           <SubscribeButton plan="annual" size="lg" className="mt-6 w-full">
             Join annually
           </SubscribeButton>
@@ -36,13 +41,18 @@ export default function PricingPage() {
         <Card>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted">Flexible</p>
           <CardTitle className="mt-2">Monthly</CardTitle>
-          <p className="mt-4 font-serif text-5xl text-navy-900">${PLANS.monthly.amountCents / 100}</p>
+          <p className="mt-4 font-serif text-5xl text-navy-900">{price("monthly")}</p>
           <CardDescription>per month, cancel any time</CardDescription>
           <SubscribeButton plan="monthly" size="lg" variant="secondary" className="mt-6 w-full">
             Join monthly
           </SubscribeButton>
         </Card>
       </div>
+
+      <p className="mt-4 text-sm text-muted">
+        Prices in {region.currency.toUpperCase()} for {region.code === "XX" ? "your country" : region.name}. {taxNote(region)}. Not right? Choose your country at the
+        bottom of the page.
+      </p>
 
       <ul className="mt-12 grid gap-3 text-ink sm:grid-cols-2">
         {INCLUDED.map((item) => (

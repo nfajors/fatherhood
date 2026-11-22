@@ -20,6 +20,7 @@
     "db:migrate:deploy": "node scripts/migrate.mjs",
     "db:studio": "drizzle-kit studio",
     "revenue:settle": "tsx --env-file-if-exists=.env.local scripts/settle-revenue.ts",
+    "stripe:prices": "tsx --env-file-if-exists=.env.local scripts/stripe-prices.ts",
     "themes:seed": "tsx --env-file-if-exists=.env.local scripts/themes-seed.ts",
     "themes:assign": "tsx --env-file-if-exists=.env.local scripts/themes-assign.ts",
     "gifts:deliver": "tsx --env-file-if-exists=.env.local scripts/gifts-deliver.ts",

@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { PLANS, SITE } from "@/lib/config";
+import { SITE } from "@/lib/config";
+import { currentRegion } from "@/lib/region-server";
+import { formatPrice, priceFor } from "@/lib/regions";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const region = await currentRegion();
+  const annual = formatPrice(priceFor("annual", region.currency), region.currency, region.locale);
   return (
     <>
       <section className="bg-navy-950 text-white">
@@ -18,7 +24,7 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="/pricing">Join for ${PLANS.annual.amountCents / 100}/year</Link>
+              <Link href="/pricing">Join for {annual}/year</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10">
               <Link href="/community">Watch free stories</Link>

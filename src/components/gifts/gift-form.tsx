@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { GIFT_MESSAGE_MAX_CHARS, GIFT_TERMS, PLANS, type PlanId } from "@/lib/config";
+import { GIFT_MESSAGE_MAX_CHARS, GIFT_TERMS, type PlanId } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 type When = "now" | "date" | "self";
@@ -15,7 +15,8 @@ function isoDate(date: Date): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function GiftForm({ defaultName, defaultEmail }: { defaultName?: string; defaultEmail?: string }) {
+/** `prices` are already formatted in the buyer's currency (from their region). */
+export function GiftForm({ defaultName, defaultEmail, prices }: { defaultName?: string; defaultEmail?: string; prices: Record<PlanId, string> }) {
   const [plan, setPlan] = useState<PlanId>("annual");
   const [when, setWhen] = useState<When>("now");
   const [message, setMessage] = useState("");
@@ -70,7 +71,7 @@ export function GiftForm({ defaultName, defaultEmail }: { defaultName?: string; 
               )}
             >
               <input type="radio" name="plan" value={id} checked={plan === id} onChange={() => setPlan(id)} className="sr-only" />
-              <span className="font-serif text-3xl text-navy-900">${PLANS[id].amountCents / 100}</span>
+              <span className="font-serif text-3xl text-navy-900">{prices[id]}</span>
               <span className="mt-1 text-muted">{GIFT_TERMS[id].label} of membership</span>
             </label>
           ))}
@@ -155,7 +156,7 @@ export function GiftForm({ defaultName, defaultEmail }: { defaultName?: string; 
         </p>
       )}
       <Button type="submit" size="lg" disabled={pending} className="w-full sm:w-auto">
-        {pending ? "Starting checkout..." : `Continue to payment: $${PLANS[plan].amountCents / 100}`}
+        {pending ? "Starting checkout..." : `Continue to payment: ${prices[plan]}`}
       </Button>
     </form>
   );

@@ -3,14 +3,14 @@ import type Stripe from "stripe";
 import { getDb } from "@/lib/db";
 import { getMailer } from "@/lib/email";
 import { appUrl } from "@/lib/env";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, settledUsdForPaymentIntent } from "@/lib/stripe";
 import { deliverDueGifts, markGiftPaid, sendPurchaserConfirmation, type BillingCredits, type Gift } from "./service";
 
 export const stripeCredits: BillingCredits = {
-  async adjust(customerId, amountCents, description, idempotencyKey) {
+  async adjust(customerId, amountCents, currency, description, idempotencyKey) {
     const txn = await getStripe().customers.createBalanceTransaction(
       customerId,
-      { amount: amountCents, currency: "usd", description },
+      { amount: amountCents, currency, description },
       { idempotencyKey },
     );
     return txn.id;
@@ -29,11 +29,15 @@ export function isPaidGiftCheckout(session: Stripe.Checkout.Session): boolean {
  */
 export async function recordGiftPayment(session: Stripe.Checkout.Session): Promise<Gift | null> {
   if (!isPaidGiftCheckout(session)) return null;
+  const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+  const currency = session.currency ?? "usd";
   return markGiftPaid(getDb(), {
     giftId: session.metadata!.giftId!,
     checkoutSessionId: session.id,
-    paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null),
+    paymentIntentId,
     amountPaidCents: session.amount_total ?? 0,
+    currency,
+    settledUsdCents: currency === "usd" ? (session.amount_total ?? 0) : paymentIntentId ? await settledUsdForPaymentIntent(paymentIntentId) : null,
     paidAt: new Date(),
   });
 }

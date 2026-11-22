@@ -10,6 +10,7 @@ import { percent } from "@/lib/analytics/compare";
 import { analyticsOverview, parseRange, RANGES, rangeEndingAt } from "@/lib/analytics/service";
 import { getDb } from "@/lib/db";
 import { formatCount, formatWatchTime } from "@/lib/format";
+import { formatAmount } from "@/lib/regions";
 import { REVENUE_POLICY } from "@/lib/revenue/policy";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
       <section aria-label="Headline numbers" className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Members" value={members.active.toLocaleString("en-US")} current={members.active} previous={members.activeAtStart} period="start of range" />
-        <Kpi label="Monthly recurring revenue" value={dollars(members.mrrCents)} detail={`${members.renewing} renewing · ${members.cancelling} set to cancel`} />
+        <Kpi
+          label="Monthly recurring revenue"
+          value={members.mrrByCurrency.length ? members.mrrByCurrency.map((m) => formatAmount(m.cents, m.currency).replace(/\.00$/, "")).join(" + ") : dollars(0)}
+          detail={`${members.renewing} renewing · ${members.cancelling} set to cancel`}
+        />
         <Kpi label="Revenue" value={dollars(money.totalCents.current)} current={money.totalCents.current} previous={money.totalCents.previous} period={period} />
         <Kpi label="Sign-ups" value={joined.count.current.toLocaleString("en-US")} current={joined.count.current} previous={joined.count.previous} period={period} />
         <Kpi label="Memberships started" value={members.started.current.toLocaleString("en-US")} current={members.started.current} previous={members.started.previous} period={period} />
@@ -101,7 +106,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 ]}
               />
             </div>
-            <p className="mt-4 text-xs text-muted">Monthly recurring revenue counts annual plans at a twelfth of $199. Gifts and organization seats are paid up front, so they aren&apos;t in it.</p>
+            <p className="mt-4 text-xs text-muted">Monthly recurring revenue counts annual plans at a twelfth of their price, in each currency members pay in (not converted). Gifts and organization seats are paid up front, so they aren&apos;t in it.</p>
           </Card>
         </div>
       </Section>

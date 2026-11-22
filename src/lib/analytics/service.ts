@@ -25,7 +25,7 @@ import {
   videos,
   watchSessions,
 } from "@/lib/db/schema";
-import { PLANS } from "@/lib/config";
+import { isCurrency, PRICES, type Currency } from "@/lib/regions";
 import { REVENUE_POLICY } from "@/lib/revenue/policy";
 
 export const RANGES = [7, 30, 90] as const;
@@ -98,15 +98,26 @@ export async function membership(db: Database, range: Range) {
     .from(subscriptions)
     .where(and(inArray(subscriptions.status, [...ACCESS]), sql`${subscriptions.currentPeriodEnd} > ${iso(now)}`));
 
-  // Monthly recurring revenue from auto-renewing plans; members set to cancel still count until they lapse.
-  const [mrr] = await db
+  // Monthly recurring revenue from auto-renewing plans, per currency at the list prices
+  // (lib/regions.ts); members set to cancel still count until they lapse.
+  const recurring = await db
     .select({
-      cents: sql<number>`coalesce(sum(case ${subscriptions.plan} when 'monthly' then ${PLANS.monthly.amountCents} when 'annual' then ${PLANS.annual.amountCents} / 12.0 else 0 end), 0)::int`,
-      renewing: sql<number>`count(*) filter (where not ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} in ('monthly', 'annual'))::int`,
-      cancelling: sql<number>`count(*) filter (where ${subscriptions.cancelAtPeriodEnd} and ${subscriptions.plan} in ('monthly', 'annual'))::int`,
+      currency: subscriptions.currency,
+      plan: subscriptions.plan,
+      n: sql<number>`count(*)::int`,
+      renewing: sql<number>`count(*) filter (where not ${subscriptions.cancelAtPeriodEnd})::int`,
     })
     .from(subscriptions)
-    .where(and(inArray(subscriptions.status, ["active", "past_due"]), sql`${subscriptions.currentPeriodEnd} > ${iso(now)}`));
+    .where(and(inArray(subscriptions.status, ["active", "past_due"]), inArray(subscriptions.plan, ["monthly", "annual"]), sql`${subscriptions.currentPeriodEnd} > ${iso(now)}`))
+    .groupBy(subscriptions.currency, subscriptions.plan);
+  const mrrByCurrency = new Map<string, number>();
+  for (const r of recurring) {
+    const prices = PRICES[(isCurrency(r.currency) ? r.currency : "usd") as Currency];
+    const monthly = r.plan === "annual" ? prices.annual / 12 : prices.monthly;
+    mrrByCurrency.set(r.currency, (mrrByCurrency.get(r.currency) ?? 0) + monthly * r.n);
+  }
+  const renewing = recurring.reduce((t, r) => t + r.renewing, 0);
+  const cancelling = recurring.reduce((t, r) => t + r.n - r.renewing, 0);
 
   const startedIn = (from: Date, to: Date) =>
     db
@@ -148,9 +159,11 @@ export async function membership(db: Database, range: Range) {
     active: active?.n ?? 0,
     activeAtStart: atStart,
     plans: { monthly: byPlan.monthly ?? 0, annual: byPlan.annual ?? 0, gift: byPlan.gift ?? 0, organization: byPlan.organization ?? 0 },
-    mrrCents: mrr?.cents ?? 0,
-    renewing: mrr?.renewing ?? 0,
-    cancelling: mrr?.cancelling ?? 0,
+    /** US-dollar memberships only; see mrrByCurrency for the rest. */
+    mrrCents: Math.round(mrrByCurrency.get("usd") ?? 0),
+    mrrByCurrency: [...mrrByCurrency.entries()].map(([currency, cents]) => ({ currency, cents: Math.round(cents) })).sort((a, b) => (a.currency === "usd" ? -1 : b.currency === "usd" ? 1 : a.currency.localeCompare(b.currency))),
+    renewing,
+    cancelling,
     started: { current: started?.n ?? 0, previous: startedBefore?.n ?? 0 } satisfies Compared,
     ended: { current: ended?.n ?? 0, previous: endedBefore?.n ?? 0 } satisfies Compared,
     /** Memberships that ended in the range, per member at its start. Null with no members to lose. */

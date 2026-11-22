@@ -33,6 +33,7 @@ export type SubscriptionRecord = {
   stripePriceId: string;
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
+  currency: string;
 };
 
 /**
@@ -64,13 +65,16 @@ export function toSubscriptionRecord(
     stripePriceId: priceId,
     currentPeriodEnd: new Date(periodEnd * 1000),
     cancelAtPeriodEnd: sub.cancel_at_period_end,
+    currency: sub.currency,
   };
 }
 
 export type LedgerEntry = {
   stripeInvoiceId: string;
   stripeCustomerId: string;
+  /** What the customer paid, in `currency`. */
   amountCents: number;
+  currency: string;
   paidAt: Date;
 };
 
@@ -86,6 +90,45 @@ export function toLedgerEntry(invoice: Stripe.Invoice): LedgerEntry | null {
     stripeInvoiceId: invoice.id,
     stripeCustomerId: typeof invoice.customer === "string" ? invoice.customer : invoice.customer.id,
     amountCents: invoice.amount_paid,
+    currency: invoice.currency,
     paidAt: new Date(paidAt * 1000),
   };
+}
+
+/** The US-dollar amount of a balance transaction, or null if it settled in another currency. */
+export function usdFromBalanceTransaction(bt: Pick<Stripe.BalanceTransaction, "amount" | "currency"> | null | undefined): number | null {
+  return bt && bt.currency === "usd" ? bt.amount : null;
+}
+
+async function settledUsdForCharge(charge: string | Stripe.Charge | null | undefined): Promise<number | null> {
+  if (!charge) return null;
+  const c = typeof charge === "string" ? await getStripe().charges.retrieve(charge, { expand: ["balance_transaction"] }) : charge;
+  const bt = c.balance_transaction;
+  if (typeof bt === "string") return usdFromBalanceTransaction(await getStripe().balanceTransactions.retrieve(bt));
+  return usdFromBalanceTransaction(bt);
+}
+
+/**
+ * How much a payment in another currency added to the platform's US-dollar balance:
+ * the gross of its charge's balance transaction, after Stripe's conversion. The
+ * creator pool shares these settled dollars.
+ */
+export async function settledUsdForPaymentIntent(paymentIntentId: string): Promise<number | null> {
+  const pi = await getStripe().paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge.balance_transaction"] });
+  return settledUsdForCharge(pi.latest_charge);
+}
+
+/** The settled US dollars of every payment on a paid invoice, or null if any can't be found. */
+export async function settledUsdForInvoice(invoiceId: string): Promise<number | null> {
+  const payments = await getStripe().invoicePayments.list({ invoice: invoiceId, status: "paid", limit: 20 });
+  let total = 0;
+  for (const p of payments.data) {
+    const usd =
+      p.payment.type === "payment_intent" && p.payment.payment_intent
+        ? await settledUsdForPaymentIntent(typeof p.payment.payment_intent === "string" ? p.payment.payment_intent : p.payment.payment_intent.id)
+        : await settledUsdForCharge(p.payment.charge);
+    if (usd === null) return null;
+    total += usd;
+  }
+  return payments.data.length ? total : null;
 }

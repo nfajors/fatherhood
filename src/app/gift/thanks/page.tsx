@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { Button } from "@/components/ui/button";
 import { GIFT_TERMS, type PlanId } from "@/lib/config";
 import { getDb } from "@/lib/db";
+import { currentRegion } from "@/lib/region-server";
 import { appUrl } from "@/lib/env";
 import { redeemUrl } from "@/lib/gifts/emails";
 import { recordGiftPayment, sendGiftEmails } from "@/lib/gifts/runtime";
@@ -13,10 +14,11 @@ import { getStripe } from "@/lib/stripe";
 export const metadata: Metadata = { title: "Thank you for your gift", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-const formatDate = (date: Date) => date.toLocaleDateString("en-US", { dateStyle: "long" });
+const formatDateIn = (locale: string) => (date: Date) => date.toLocaleDateString(locale, { dateStyle: "long" });
 
 export default async function GiftThanksPage({ searchParams }: { searchParams: Promise<{ session_id?: string }> }) {
   const { session_id: sessionId } = await searchParams;
+  const formatDate = formatDateIn((await currentRegion()).locale);
   const db = getDb();
   let gift = sessionId ? await getGiftByCheckoutSession(db, sessionId) : undefined;
 

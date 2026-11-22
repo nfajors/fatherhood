@@ -362,6 +362,10 @@ real engagement data exists.
   from his profile, crisis resources on every page, private and deletable conversations, and a
   daily message limit.
 - International expansion.
+  *Built November 22, 2026:* English-speaking countries first (US, UK, Canada, Australia, New Zealand,
+  Ireland): local prices you set, synced to Stripe; charges in the visitor's currency with Stripe Tax;
+  settled US dollars in the revenue ledger for the creator pool; dates per country; data download and
+  account deletion. English only for now.
 
 **Immediate Priorities for Claude Code:**
 1. Scaffold Next.js app with auth, DB, Stripe.
