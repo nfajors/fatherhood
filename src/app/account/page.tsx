@@ -4,6 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmailSettingsForm } from "@/components/email/email-settings";
 import { PrivacyControls } from "@/components/account/privacy-controls";
+import { PasswordLinkButton } from "@/components/auth/password-reset-forms";
+import { hasPassword } from "@/lib/account/password-reset";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { SharingControls } from "@/components/organizations/forms";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,12 @@ export default async function AccountPage() {
   if (!sessionUser) redirect("/sign-in?next=/account");
 
   const db = getDb();
-  const [prefs, orgs, region] = await Promise.all([getPreferences(db, sessionUser.id), membershipsFor(db, sessionUser.id), currentRegion()]);
+  const [prefs, orgs, region, withPassword] = await Promise.all([
+    getPreferences(db, sessionUser.id),
+    membershipsFor(db, sessionUser.id),
+    currentRegion(),
+    hasPassword(db, sessionUser.id),
+  ]);
   const rows = await db
     .select()
     .from(subscriptions)
@@ -88,6 +95,15 @@ export default async function AccountPage() {
           </ul>
         </Card>
       )}
+      <Card className="mt-6" id="password">
+        <CardTitle>Password</CardTitle>
+        <CardDescription className="mb-5">
+          {withPassword
+            ? "You sign in with your email and password."
+            : "You sign in with Google. Set a password to sign in with your email too, for example in the iPhone and Android app."}
+        </CardDescription>
+        <PasswordLinkButton email={sessionUser.email} hasPassword={withPassword} />
+      </Card>
       <Card className="mt-6" id="email">
         <CardTitle>Email</CardTitle>
         <CardDescription className="mb-5">Sent to {sessionUser.email}.</CardDescription>

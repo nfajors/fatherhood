@@ -6,6 +6,8 @@ import { headers } from "next/headers";
 import { getDb, schema } from "@/lib/db";
 import type { UserRole } from "@/lib/db/schema";
 import { appUrl, authEnv } from "@/lib/env";
+import { getMailer } from "@/lib/email";
+import { hasPassword, resetPasswordEmail, RESET_POLICY, shouldSendReset } from "@/lib/account/password-reset";
 
 function createAuth() {
   const env = authEnv();
@@ -26,7 +28,19 @@ function createAuth() {
         verification: schema.verification,
       },
     }),
-    emailAndPassword: { enabled: true, minPasswordLength: 10 },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 10,
+      // Also how people who signed up with Google set a password (the reset adds one).
+      resetPasswordTokenExpiresIn: RESET_POLICY.linkMinutes * 60,
+      // A new password signs out every device, in case the old one leaked.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        const db = getDb();
+        if (!(await shouldSendReset(db, user.id))) return;
+        await getMailer().send(resetPasswordEmail({ to: user.email, name: user.name, url, hasPassword: await hasPassword(db, user.id) }));
+      },
+    },
     socialProviders: google,
     user: {
       additionalFields: {

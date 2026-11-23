@@ -66,6 +66,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           {error}
         </p>
       )}
+      {mode === "sign-in" && (
+        <p className="-mt-1 text-right text-sm">
+          <Link href="/forgot-password" className="text-muted underline">
+            Forgot your password?
+          </Link>
+        </p>
+      )}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Please wait..." : mode === "sign-up" ? "Create account" : "Sign in"}
       </Button>

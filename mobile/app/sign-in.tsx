@@ -7,8 +7,10 @@ import { Redirect } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as WebBrowser from "expo-web-browser";
 import { ApiError } from "../src/api/client";
 import { useAuth } from "../src/auth/AuthProvider";
+import { API_URL } from "../src/config";
 import { Body, Button } from "../src/ui/components";
 import { colors, serif, space } from "../src/ui/theme";
 
@@ -64,9 +66,15 @@ export default function SignIn() {
           />
           {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
           <Button title="Sign in" onPress={submit} busy={busy} disabled={!email || !password} style={{ marginTop: space(5) }} />
+          <Button
+            title="Forgot your password?"
+            variant="quiet"
+            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/forgot-password${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ""}`)}
+            style={{ marginTop: space(2) }}
+          />
         </View>
         <Body muted style={styles.note}>
-          Sign in with the account you use on fatherhood.school.
+          Sign in with the account you use on fatherhood.school. Signed up with Google? Use “Forgot your password?” to set one.
         </Body>
       </KeyboardAvoidingView>
     </SafeAreaView>
