@@ -405,7 +405,8 @@ with their website account; the app has the Academy, Community Voices, the playe
 30-day offline downloads. It sells nothing and shows no prices (Apple and Google "reader app"
 rules), so memberships are still bought on the website.
 
-- **Sign-in.** Better Auth's bearer plugin: the app signs in at `/api/auth/sign-in/email`, keeps
+- **Sign-in.** "Forgot your password?" in the app opens the website's reset page, which is also
+  how members who signed up with Google set a password for the app. Better Auth's bearer plugin: the app signs in at `/api/auth/sign-in/email`, keeps
   the token from the `set-auth-token` header in the phone's secure storage, and sends it as
   `Authorization: Bearer …`. Every API route that reads the session accepts it.
 - **API.** `/api/mobile/v1`: `me`, `home`, `courses`, `courses/[slug]`, `community`, `videos/[id]`,
@@ -420,6 +421,18 @@ rules), so memberships are still bought on the website.
   membership ends or the video is unpublished, and the app then deletes the file. Progress made
   offline is saved when the app syncs (newest record wins), but views and creator-pool time are
   only counted while streaming.
+
+## Passwords
+
+- **Forgot your password?** (`/forgot-password`, linked from sign-in and from the app) emails a
+  one-time link that works for an hour. It lands on `/reset-password`, where they choose a new
+  password (10+ characters). Setting it signs them out everywhere, including the app.
+- **Signed up with Google?** The same link sets a first password, so they can also sign in with
+  email and password (the app has no Google sign-in). Google sign-in keeps working. The account
+  page's Password card sends the link with one click ("set one" or "change it").
+- **Abuse.** The answer is the same whether or not the email has an account. Better Auth allows 3
+  requests a minute from one address, and `src/lib/account/password-reset.ts` emails at most 3
+  links per account in 15 minutes (later requests are answered but not emailed).
 
 ## Lesson downloads
 

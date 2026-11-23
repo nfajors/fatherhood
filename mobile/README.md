@@ -19,8 +19,9 @@ The members' app, built with Expo (SDK 58, React Native 0.88, Expo Router). Vers
   resources. Links in the coach's replies open the lesson or story in the app.
 - **Account**: membership status (no prices), sign out, and delete account.
 
-Not in version 1: Discussions, push notifications, Google sign-in, and a password reset (members
-who signed up with Google, or forgot their password, can't sign in to the app yet).
+Not in version 1: Discussions, push notifications and Google sign-in. Members who signed up with
+Google, or forgot their password, tap "Forgot your password?", which opens the website's
+`/forgot-password` page: the emailed link sets (or resets) a password they can use in the app.
 
 ## Running it
 
